@@ -113,7 +113,7 @@ const gameSettings = {
   speedScale: 1.0,   // 氣球掉落速度倍率 (0.7: 慢速, 1.0: 標準, 1.3: 快速)
   assistMode: false, // 新手輔助模式 (預設關閉)
   gunSmoothing: 0.35,// 光線槍瞄準平滑係數 (0.6: 極速, 0.35: 標準, 0.15: 抗抖)
-  bgmEnabled: true,  // 背景音樂是否開啟
+  bgmVolume: 0.3,    // 背景音樂音量大小 (0.0 ~ 1.0, 預設 30%)
   
   load() {
     const saved = localStorage.getItem('bpmf_settings');
@@ -126,7 +126,7 @@ const gameSettings = {
         if (typeof parsed.speedScale === 'number') this.speedScale = parsed.speedScale;
         if (typeof parsed.assistMode === 'boolean') this.assistMode = parsed.assistMode;
         if (typeof parsed.gunSmoothing === 'number') this.gunSmoothing = parsed.gunSmoothing;
-        if (typeof parsed.bgmEnabled === 'boolean') this.bgmEnabled = parsed.bgmEnabled;
+        if (typeof parsed.bgmVolume === 'number') this.bgmVolume = parsed.bgmVolume;
       } catch (e) {
         console.error("載入設定失敗，使用預設值", e);
       }
@@ -141,7 +141,7 @@ const gameSettings = {
       speedScale: this.speedScale,
       assistMode: this.assistMode,
       gunSmoothing: this.gunSmoothing,
-      bgmEnabled: this.bgmEnabled
+      bgmVolume: this.bgmVolume
     }));
   }
 };

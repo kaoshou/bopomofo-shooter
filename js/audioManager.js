@@ -277,7 +277,7 @@ class AudioManager {
 
   // 啟動 8-bit 循環背景音樂 (純 Web Audio API 合成)
   startBGM() {
-    if (typeof gameSettings === 'undefined' || !gameSettings.bgmEnabled) return;
+    if (typeof gameSettings === 'undefined' || gameSettings.bgmVolume === 0) return;
     this.stopBGM();
     this.initAudioContext();
     if (!this.ctx) return;
@@ -319,7 +319,7 @@ class AudioManager {
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
 
-      const vol = typeof gameSettings !== 'undefined' ? gameSettings.sfxVolume * 0.12 : 0.05; // 限制 BGM 音量，使它在背景輕輕播放
+      const vol = typeof gameSettings !== 'undefined' ? gameSettings.bgmVolume * 0.2 : 0.06; // 限制 BGM 音量，使它在背景輕輕播放
       gain.gain.setValueAtTime(vol, this.ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.22);
 
@@ -339,6 +339,30 @@ class AudioManager {
       this.bgmTimer = null;
       console.log("🔇 8-bit 背景音樂停止");
     }
+  }
+
+  // 播放背景音樂調整時的音量測試回饋
+  playBGMFeedback() {
+    this.initAudioContext();
+    if (!this.ctx) return;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    // 播放 C3 (130.81Hz) 三角波低音作為音量參考
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(130.81, this.ctx.currentTime);
+
+    // 以當前背景音樂音量大小作基準
+    const vol = typeof gameSettings !== 'undefined' ? gameSettings.bgmVolume * 0.2 : 0.06;
+    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
+
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.16);
   }
 }
 

@@ -229,16 +229,16 @@ document.addEventListener('DOMContentLoaded', () => {
     audioManager.playCorrect();
   });
 
-  // 背景音樂設定
+  // 背景音樂音量調整
   document.getElementById('btn-setting-bgm-dec').addEventListener('click', () => {
-    gameSettings.bgmEnabled = false;
+    gameSettings.bgmVolume = Math.max(0, Math.round((gameSettings.bgmVolume - 0.1) * 10) / 10);
     updateSettingsUI();
-    audioManager.playCorrect();
+    audioManager.playBGMFeedback(); // 播放音量測試回饋
   });
   document.getElementById('btn-setting-bgm-inc').addEventListener('click', () => {
-    gameSettings.bgmEnabled = true;
+    gameSettings.bgmVolume = Math.min(1.0, Math.round((gameSettings.bgmVolume + 0.1) * 10) / 10);
     updateSettingsUI();
-    audioManager.playCorrect();
+    audioManager.playBGMFeedback();
   });
 
   // 確認並儲存
@@ -269,8 +269,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (gameSettings.gunSmoothing === 0.15) smoothText = '抗抖';
     document.getElementById('setting-smoothing-val').textContent = smoothText;
 
-    // 新增背景音樂對應
-    document.getElementById('setting-bgm-val').textContent = gameSettings.bgmEnabled ? '開啟' : '關閉';
+    // 新增背景音樂音量百分比對應
+    document.getElementById('setting-bgm-val').textContent = gameSettings.bgmVolume === 0 ? '關閉' : `${Math.round(gameSettings.bgmVolume * 100)}%`;
   }
 
   // 6. 綁定暫停 Scene 事件
