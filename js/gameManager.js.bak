@@ -157,8 +157,8 @@ class GameManager {
     const allowed = config.allowedSymbols;
     this.targetChar = allowed[Math.floor(Math.random() * allowed.length)];
     
-    // 更新 HUD 題目顯示 (強制設為 ❓ 以防視覺透題，進行純聽音訓練)
-    document.getElementById('question-char').textContent = '❓';
+    // 更新 HUD 題目顯示 (強制設為 ？ 以防視覺透題，進行純聽音訓練)
+    document.getElementById('question-char').textContent = '？';
     
     // 2. 播放注音發音
     audioManager.playZhuyin(this.targetChar);
@@ -342,7 +342,7 @@ class GameManager {
     }
 
     // 2P 分數與 Combo
-    if (this.selectedMode.startsWith('2p')) {
+    if (this.selectedMode && this.selectedMode.startsWith('2p')) {
       document.getElementById('p2-score').textContent = this.p2.score;
       const p2ComboEl = document.getElementById('p2-combo');
       if (this.p2.combo > 0) {
@@ -361,13 +361,19 @@ class GameManager {
     livesContainer.innerHTML = '';
     
     if (this.selectedDiff === 'boss') {
-      // Boss 關卡：顯示 Boss 血量條與玩家血量
-      livesContainer.innerHTML = `<span style="color:#facc15;">😈 Boss HP: ${this.bossHp}/${this.bossMaxHp}</span>`;
+      // Boss 關卡：顯示 Boss 血量條與玩家血量，移除 😈
+      livesContainer.innerHTML = `<span style="color:#ef4444; display: inline-flex; align-items: center; gap: 6px; font-weight: bold;"><svg class="icon-svg icon-svg-fill" viewBox="0 0 24 24" style="width: 1.5em; height: 1.5em;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 16h-2v-2h2v2zm0-4h-2V7h2v7z"></path><path d="M5.3 4.9c.4.4.4 1 0 1.4l-1.4 1.4c-.4.4-1 .4-1.4 0s-.4-1 0-1.4l1.4-1.4c.4-.4 1-.4 1.4 0zm14.8 0c.4-.4 1-.4 1.4 0s.4 1 0 1.4l-1.4 1.4c-.4.4-1 .4-1.4 0s-.4-1 0-1.4l1.4-1.4z"></path></svg> Boss HP: ${this.bossHp}/${this.bossMaxHp}</span>`;
     } else {
-      // 一般關卡：顯示愛心 ❤️
+      // 一般關卡：顯示愛心 SVG
       for (let i = 0; i < this.maxLives; i++) {
         const heart = document.createElement('span');
-        heart.textContent = i < this.lives ? '❤️' : '🖤';
+        if (i < this.lives) {
+          heart.className = 'hud-heart active';
+          heart.innerHTML = `<svg class="icon-svg icon-svg-fill" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>`;
+        } else {
+          heart.className = 'hud-heart empty';
+          heart.innerHTML = `<svg class="icon-svg" viewBox="0 0 24 24" style="stroke-width: 1.5;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>`;
+        }
         livesContainer.appendChild(heart);
       }
     }
@@ -398,12 +404,15 @@ class GameManager {
   populateResults() {
     const isBossWin = this.selectedDiff === 'boss' && this.bossHp <= 0;
     
-    // 設定標題
+    // 設定標題，移除 Emoji 🎉 / 💀，使用 SVG 圖示
     const titleEl = document.getElementById('result-title');
+    const winIcon = `<svg class="icon-svg icon-svg-fill" viewBox="0 0 24 24" style="color: #facc15; margin-right: 8px; width: 1.5em; height: 1.5em; vertical-align: middle;"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"></path><rect x="5" y="18" width="14" height="2"></rect></svg>`;
+    const loseIcon = `<svg class="icon-svg" viewBox="0 0 24 24" style="color: #f87171; margin-right: 8px; width: 1.5em; height: 1.5em; vertical-align: middle;"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="15.01" y2="9"></line><line x1="9" y1="9" x2="9.01" y2="9"></line><path d="M16 16s-1.5-2-4-2-4 2-4 2"></path></svg>`;
+    
     if (this.selectedDiff === 'boss') {
-      titleEl.textContent = isBossWin ? '🎉 擊敗大魔王！' : '💀 挑戰失敗！';
+      titleEl.innerHTML = isBossWin ? `${winIcon}擊敗大魔王！` : `${loseIcon}挑戰失敗！`;
     } else {
-      titleEl.textContent = this.lives > 0 ? '🎉 挑戰成功！' : '💀 挑戰失敗！';
+      titleEl.innerHTML = this.lives > 0 ? `${winIcon}挑戰成功！` : `${loseIcon}挑戰失敗！`;
     }
 
     const singleRes = document.getElementById('single-results');
@@ -661,7 +670,7 @@ class GameManager {
       ctx.fillStyle = 'rgba(239, 68, 68, 0.7)';
       ctx.font = 'bold 14px Noto Sans TC';
       ctx.textAlign = 'right';
-      ctx.fillText('⚠️ 氣球落地警告線', GAME_WIDTH - 20, GAME_HEIGHT - 70);
+      ctx.fillText('▲ 氣球落地警戒線', GAME_WIDTH - 20, GAME_HEIGHT - 70);
       ctx.restore();
     }
   }

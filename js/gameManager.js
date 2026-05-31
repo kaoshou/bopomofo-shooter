@@ -28,6 +28,10 @@ class GameManager {
     // Boss 關卡資訊
     this.bossHp = 15;
     this.bossMaxHp = 15;
+
+    // 精進功能屬性
+    this.flashDuration = 0;
+    this.questionStartTime = 0;
   }
 
   init() {
@@ -59,11 +63,17 @@ class GameManager {
     if (newState === 'PLAYING') {
       document.getElementById('hud-overlay').classList.remove('hidden');
       this.startGameplay();
+      if (typeof audioManager !== 'undefined') {
+        audioManager.startBGM();
+      }
     } else {
       // 非遊玩中隱藏 HUD Overlay (除了 PAUSED 狀態要留著 HUD)
       if (newState !== 'PAUSED') {
         document.getElementById('hud-overlay').classList.add('hidden');
         clearInterval(this.timerInterval);
+        if (typeof audioManager !== 'undefined') {
+          audioManager.stopBGM();
+        }
       }
     }
 
@@ -153,12 +163,19 @@ class GameManager {
 
     const config = DIFFICULTY_CONFIG[this.selectedDiff];
     
+    // 重設題目出題時間，供新手輔助模式倒數使用
+    this.questionStartTime = Date.now();
+    
     // 1. 決定正確答案 (從難度允許的名單中隨機挑選)
     const allowed = config.allowedSymbols;
     this.targetChar = allowed[Math.floor(Math.random() * allowed.length)];
     
     // 更新 HUD 題目顯示 (強制設為 ？ 以防視覺透題，進行純聽音訓練)
-    document.getElementById('question-char').textContent = '？';
+    const qChar = document.getElementById('question-char');
+    if (qChar) {
+      qChar.textContent = '？';
+      qChar.style.color = '#ffffff';
+    }
     
     // 2. 播放注音發音
     audioManager.playZhuyin(this.targetChar);
@@ -228,7 +245,8 @@ class GameManager {
       const b = this.balloons[i];
       if (b.active && b.checkCollision(x, y)) {
         hitAnything = true;
-        b.active = false; // 擊碎氣球
+        b.isPopping = true; // 觸發氣球收縮爆裂動效
+        this.flashDuration = 2; // 畫面閃光 2 幀
         
         // 產生爆裂粒子特效
         particleSystem.spawnExplosion(b.x, b.y, b.color, 25);
@@ -450,6 +468,9 @@ class GameManager {
       winBanner2.classList.add('hidden');
       card1.classList.remove('winner');
       card2.classList.remove('winner');
+      
+      const evalEl = document.getElementById('coop-team-evaluation');
+      if (evalEl) evalEl.classList.add('hidden');
 
       if (this.selectedMode === '2p-vs') {
         // 對抗模式：顯示獲勝者
@@ -470,8 +491,32 @@ class GameManager {
           }
         }
       } else {
-        // 合作模式：不凸顯個人勝負，只顯現團隊數值
-        // 可以在雙人卡片加上「合作無間」等字眼，這裡移除 winner banner
+        // 合作模式：展示團隊綜合評估
+        if (evalEl) {
+          evalEl.classList.remove('hidden');
+          const totalScore = this.p1.score + this.p2.score;
+          const avgAcc = Math.round((this.p1.getAccuracy() + this.p2.getAccuracy()) / 2);
+          
+          let rank = '💥 互相傷害 (C 級)';
+          let desc = '確定沒有把子彈射在隊友準星上嗎？再多練習，培養一下默契吧！';
+          
+          if (totalScore >= 3000 && avgAcc >= 85) {
+            rank = '👑 神射俠侶 (S 級)';
+            desc = '合作無間，百發百中！你們的默契已經無人能敵，堪稱黃金拍檔！';
+          } else if (totalScore >= 1800) {
+            rank = '🎮 合作無間 (A 級)';
+            desc = '配合得相當有默契！大部分氣球都被你們聯手擊破了，非常優秀！';
+          } else if (totalScore >= 1000) {
+            rank = '🎈 漸入佳境 (B 級)';
+            desc = '氣球漏得不多，分工還可以再更細密一些，下次一定能拿 S 級！';
+          }
+          
+          evalEl.innerHTML = `
+            <div style="font-size: 1.3rem; font-weight: 900; color: var(--color-accent-yellow); margin-bottom: 8px;">團隊綜合評價：${rank}</div>
+            <div style="font-size: 1rem; color: rgba(255,255,255,0.8); line-height: 1.5;">P1+P2 總分：<span style="color:#fff;font-weight:bold;">${totalScore}</span> | 團隊平均命中率：<span style="color:#fff;font-weight:bold;">${avgAcc}%</span></div>
+            <div style="font-size: 0.95rem; color: var(--color-accent-pink); margin-top: 5px; font-style: italic;">"${desc}"</div>
+          `;
+        }
       }
     }
   }
@@ -495,7 +540,7 @@ class GameManager {
     const p2Crosshair = document.getElementById('dom-crosshair-p2');
     
     // 只在選單狀態顯示 DOM 準星，避免跟遊戲中 Canvas 繪製的準星重疊
-    const isMenuState = ['HOME', 'MODE_SELECT', 'TUTORIAL', 'LICENSE', 'PAUSED', 'RESULT'].includes(this.state);
+    const isMenuState = ['HOME', 'MODE_SELECT', 'TUTORIAL', 'LICENSE', 'SETTINGS', 'PAUSED', 'RESULT'].includes(this.state);
     
     if (isMenuState) {
       // P1 Gamepad 準星 (使用 Viewport 的 client 座標，解決 CSS 縮放偏差)
@@ -539,6 +584,17 @@ class GameManager {
 
     // 1. 更新邏輯 (僅在 PLAYING 狀態下更新物理)
     if (this.state === 'PLAYING') {
+      // 新手輔助模式：出題 5 秒後在畫面上提示答案
+      if (typeof gameSettings !== 'undefined' && gameSettings.assistMode) {
+        if (Date.now() - this.questionStartTime > 5000) {
+          const qChar = document.getElementById('question-char');
+          if (qChar && qChar.textContent === '？') {
+            qChar.textContent = this.targetChar;
+            qChar.style.color = 'var(--color-accent-yellow)';
+          }
+        }
+      }
+
       // 更新玩家位置
       if (this.p1.inputType === 'mouse') {
         this.p1.x = inputManager.mouseX;
@@ -626,9 +682,16 @@ class GameManager {
       this.p1.drawCrosshair(this.ctx);
 
       // 2P 模式下繪製 2P 準星
-      if (this.selectedMode.startsWith('2p')) {
+      if (this.selectedMode && this.selectedMode.startsWith('2p')) {
         this.p2.drawCrosshair(this.ctx);
       }
+    }
+
+    // 繪製畫面射擊閃光 (Game Juice)
+    if (this.flashDuration > 0) {
+      this.ctx.fillStyle = `rgba(255, 255, 255, ${this.flashDuration * 0.12})`;
+      this.ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+      this.flashDuration--;
     }
   }
 

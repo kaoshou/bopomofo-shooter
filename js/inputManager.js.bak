@@ -284,7 +284,7 @@ class InputManager {
         const clientY = clampedY * window.innerHeight;
 
         // 指數移動平均平滑濾波 (EMA Filter)
-        const alpha = typeof gameSettings !== 'undefined' ? gameSettings.gunSmoothing : 0.35;
+        const alpha = 0.35; // 平滑強度，越小越平滑，越大反應越快 (0.35 為黃金折衷值)
         
         if (playerNum === 1) {
           if (this.p1ClientX === undefined || isNaN(this.p1ClientX)) {

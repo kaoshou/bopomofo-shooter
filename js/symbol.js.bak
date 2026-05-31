@@ -31,20 +31,10 @@ class Balloon {
 
     // 氣球繩線長度與擺動
     this.stringLength = 40;
-    this.isPopping = false;
-    this.popProgress = 0.0;
   }
 
   // 更新氣球位置與擺動
   update() {
-    if (this.isPopping) {
-      this.popProgress += 0.15; // 爆裂動畫速度
-      if (this.popProgress >= 1.0) {
-        this.active = false;
-      }
-      return 'active';
-    }
-
     this.y += this.speed;
 
     // 根據 Y 座標與正弦函數計算左右擺動
@@ -60,7 +50,7 @@ class Balloon {
 
   // 檢查是否擊中 (點到圓心的距離平方小於半徑平方，效率較佳)
   checkCollision(px, py) {
-    if (!this.active || this.isPopping) return false;
+    if (!this.active) return false;
     
     const dx = px - this.x;
     const dy = py - this.y;
@@ -77,40 +67,33 @@ class Balloon {
 
     ctx.save();
 
-    // 處理漸隱與縮小動畫
-    let currentRadius = this.radius;
-    if (this.isPopping) {
-      ctx.globalAlpha = Math.max(0, 1 - this.popProgress);
-      currentRadius = this.radius * Math.max(0, 1 - this.popProgress);
-    }
-
     // 1. 繪製氣球繩線與結
     ctx.beginPath();
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
     ctx.lineWidth = 2;
     // 繪製微彎的細線
-    ctx.moveTo(this.x, this.y + currentRadius);
+    ctx.moveTo(this.x, this.y + this.radius);
     ctx.quadraticCurveTo(
       this.x + Math.sin(this.y * 0.05) * 8, 
-      this.y + currentRadius + this.stringLength * 0.5,
+      this.y + this.radius + this.stringLength * 0.5,
       this.x, 
-      this.y + currentRadius + this.stringLength
+      this.y + this.radius + this.stringLength
     );
     ctx.stroke();
 
     // 2. 氣球小三角形繫結
     ctx.beginPath();
     ctx.fillStyle = this.borderColor;
-    ctx.moveTo(this.x, this.y + currentRadius - 2);
-    ctx.lineTo(this.x - 8, this.y + currentRadius + 10);
-    ctx.lineTo(this.x + 8, this.y + currentRadius + 10);
+    ctx.moveTo(this.x, this.y + this.radius - 2);
+    ctx.lineTo(this.x - 8, this.y + this.radius + 10);
+    ctx.lineTo(this.x + 8, this.y + this.radius + 10);
     ctx.closePath();
     ctx.fill();
 
     // 3. 氣球主體 (圓形)
     ctx.beginPath();
     // 為了讓氣球看起來更像真氣球，使用稍微拉長橢圓
-    ctx.ellipse(this.x, this.y, currentRadius * 0.95, currentRadius * 1.05, 0, 0, Math.PI * 2);
+    ctx.ellipse(this.x, this.y, this.radius * 0.95, this.radius * 1.05, 0, 0, Math.PI * 2);
     ctx.fillStyle = this.color;
     ctx.fill();
     ctx.lineWidth = 4;
@@ -119,12 +102,12 @@ class Balloon {
 
     // 4. 氣球反光效果 (立體感)
     ctx.beginPath();
-    ctx.ellipse(this.x - currentRadius * 0.35, this.y - currentRadius * 0.4, currentRadius * 0.2, currentRadius * 0.1, Math.PI / 4, 0, Math.PI * 2);
+    ctx.ellipse(this.x - this.radius * 0.35, this.y - this.radius * 0.4, this.radius * 0.2, this.radius * 0.1, Math.PI / 4, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
     ctx.fill();
 
     // 5. 繪製注音文字
-    ctx.font = `900 ${currentRadius * 1.1}px Noto Sans TC`;
+    ctx.font = `900 ${this.radius * 1.1}px Noto Sans TC`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 

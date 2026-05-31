@@ -6,8 +6,6 @@ class AudioManager {
     this.speechSynthesis = window.speechSynthesis;
     this.chineseVoice = null;
     this.currentAudio = null; // 快取當前正在播放的 Audio 物件
-    this.bgmTimer = null;
-    this.bgmSequence = 0;
     
     // 初始化語音
     this.initVoice();
@@ -273,72 +271,6 @@ class AudioManager {
     
     osc.start();
     osc.stop(this.ctx.currentTime + 0.81);
-  }
-
-  // 啟動 8-bit 循環背景音樂 (純 Web Audio API 合成)
-  startBGM() {
-    if (typeof gameSettings === 'undefined' || !gameSettings.bgmEnabled) return;
-    this.stopBGM();
-    this.initAudioContext();
-    if (!this.ctx) return;
-
-    this.bgmSequence = 0;
-    
-    // 和弦頻率陣列
-    // C和弦 (C3, G3, C4, E4)
-    // Am和弦 (A2, E3, A3, C4)
-    // F和弦 (F2, C3, F3, A3)
-    // G和弦 (G2, D3, G3, B3)
-    const chords = [
-      [130.81, 196.00, 261.63, 329.63], // C
-      [110.00, 164.81, 220.00, 261.63], // Am
-      [87.31,  130.81, 174.61, 220.00], // F
-      [98.00,  146.83, 196.00, 246.94]  // G
-    ];
-
-    const stepMs = 250; // 每拍 250 毫秒
-
-    this.bgmTimer = setInterval(() => {
-      if (!this.ctx || this.ctx.state === 'suspended') return;
-
-      const chordIdx = Math.floor(this.bgmSequence / 8) % chords.length;
-      const noteIdx = this.bgmSequence % 8;
-      
-      // 琶音順序: 0, 1, 2, 3, 2, 1, 2, 3
-      const notePattern = [0, 1, 2, 3, 2, 1, 2, 3];
-      const freq = chords[chordIdx][notePattern[noteIdx]];
-
-      // 合成 8-bit 聲波
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      // 用三角波 (triangle) 作為 8-bit 主音色
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-
-      const vol = typeof gameSettings !== 'undefined' ? gameSettings.sfxVolume * 0.12 : 0.05; // 限制 BGM 音量，使它在背景輕輕播放
-      gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.22);
-
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.25);
-
-      this.bgmSequence++;
-    }, stepMs);
-
-    console.log("🔊 8-bit 背景音樂啟動！");
-  }
-
-  // 停止背景音樂
-  stopBGM() {
-    if (this.bgmTimer) {
-      clearInterval(this.bgmTimer);
-      this.bgmTimer = null;
-      console.log("🔇 8-bit 背景音樂停止");
-    }
   }
 }
 

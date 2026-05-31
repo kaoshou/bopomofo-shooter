@@ -195,52 +195,6 @@ document.addEventListener('DOMContentLoaded', () => {
     audioManager.playCorrect();
   });
 
-  // 新手輔助開關
-  document.getElementById('btn-setting-assist-dec').addEventListener('click', () => {
-    gameSettings.assistMode = false;
-    updateSettingsUI();
-    audioManager.playCorrect();
-  });
-  document.getElementById('btn-setting-assist-inc').addEventListener('click', () => {
-    gameSettings.assistMode = true;
-    updateSettingsUI();
-    audioManager.playCorrect();
-  });
-
-  // 光槍抗抖設定
-  document.getElementById('btn-setting-smoothing-dec').addEventListener('click', () => {
-    if (gameSettings.gunSmoothing === 0.15) return;
-    if (gameSettings.gunSmoothing === 0.35) {
-      gameSettings.gunSmoothing = 0.15;
-    } else if (gameSettings.gunSmoothing === 0.6) {
-      gameSettings.gunSmoothing = 0.35;
-    }
-    updateSettingsUI();
-    audioManager.playCorrect();
-  });
-  document.getElementById('btn-setting-smoothing-inc').addEventListener('click', () => {
-    if (gameSettings.gunSmoothing === 0.6) return;
-    if (gameSettings.gunSmoothing === 0.35) {
-      gameSettings.gunSmoothing = 0.6;
-    } else if (gameSettings.gunSmoothing === 0.15) {
-      gameSettings.gunSmoothing = 0.35;
-    }
-    updateSettingsUI();
-    audioManager.playCorrect();
-  });
-
-  // 背景音樂設定
-  document.getElementById('btn-setting-bgm-dec').addEventListener('click', () => {
-    gameSettings.bgmEnabled = false;
-    updateSettingsUI();
-    audioManager.playCorrect();
-  });
-  document.getElementById('btn-setting-bgm-inc').addEventListener('click', () => {
-    gameSettings.bgmEnabled = true;
-    updateSettingsUI();
-    audioManager.playCorrect();
-  });
-
   // 確認並儲存
   document.getElementById('btn-settings-save').addEventListener('click', () => {
     gameSettings.save();
@@ -259,18 +213,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (gameSettings.speedScale === 0.7) speedText = '慢速';
     if (gameSettings.speedScale === 1.3) speedText = '快速';
     document.getElementById('setting-speed-val').textContent = speedText;
-
-    // 新增新手輔助提示對應
-    document.getElementById('setting-assist-val').textContent = gameSettings.assistMode ? '開啟' : '關閉';
-
-    // 新增光槍抗抖對應
-    let smoothText = '標準';
-    if (gameSettings.gunSmoothing === 0.6) smoothText = '極速';
-    if (gameSettings.gunSmoothing === 0.15) smoothText = '抗抖';
-    document.getElementById('setting-smoothing-val').textContent = smoothText;
-
-    // 新增背景音樂對應
-    document.getElementById('setting-bgm-val').textContent = gameSettings.bgmEnabled ? '開啟' : '關閉';
   }
 
   // 6. 綁定暫停 Scene 事件
