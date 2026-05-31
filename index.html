@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ㄅㄆㄇㄈ大挑戰 - 注音射擊教育遊戲</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="game-container">
+    <!-- 遊戲主畫布 -->
+    <canvas id="game-canvas" width="1280" height="720"></canvas>
+
+    <!-- 遊戲中 HUD Overlay -->
+    <div id="hud-overlay" class="hidden">
+      <!-- 1P 資訊 -->
+      <div id="hud-p1-panel" class="hud-panel p1">
+        <div class="hud-player p1">
+          <span>玩家 1 (1P)</span>
+          <div class="hud-score">分數: <span id="p1-score">0</span><span id="p1-combo" class="hud-combo">5 Combo</span></div>
+        </div>
+      </div>
+
+      <!-- 中央題目與時間 -->
+      <div class="hud-center">
+        <div class="hud-question-container">
+          <span class="hud-question-label">聽音射擊: ❓</span>
+          <!-- 隱藏答案字元以利聽力練習，但保留元素避免 JS 報錯 -->
+          <span id="question-char" class="hud-question-char hidden">？</span>
+          <button id="btn-replay-audio" class="btn-replay-audio" title="重聽題目">🔊</button>
+        </div>
+        <div id="hud-lives-container" class="hud-lives">
+          <!-- 心形生命值會用 JS 動態填入 -->
+        </div>
+      </div>
+
+      <!-- 2P 資訊 & 剩餘時間/暫停 -->
+      <div style="display: flex; gap: 15px; align-items: center;">
+        <div id="hud-p2-panel" class="hud-panel p2 hidden">
+          <div class="hud-player p2">
+            <span>玩家 2 (2P)</span>
+            <div class="hud-score">分數: <span id="p2-score">0</span><span id="p2-combo" class="hud-combo">3 Combo</span></div>
+          </div>
+        </div>
+
+        <div class="hud-panel">
+          <span class="hud-timer">⏳ <span id="game-timer">60</span>s</span>
+        </div>
+
+        <button id="btn-pause-hud" title="暫停遊戲">⏸ 暫停</button>
+      </div>
+    </div>
+
+    <!-- 答對 / 答錯回饋文字 -->
+    <div id="feedback-overlay">答對了！</div>
+
+    <!-- 1. 首頁場景 -->
+    <div id="home-scene" class="scene">
+      <!-- 右上角全螢幕切換按鈕 (美化版，固定在右上角) -->
+      <button id="btn-toggle-fullscreen" class="btn-fullscreen-top" title="切換全螢幕">🖥️ 全螢幕</button>
+
+      <h1 class="game-title">ㄅㄆㄇㄈ大挑戰</h1>
+      <p class="game-subtitle">聽音辨識射擊遊戲！練出好眼力與聽力</p>
+      
+      <!-- 光線槍連接狀態面板 -->
+      <div id="home-gun-status" style="margin-bottom: 15px; font-size: 1.3rem; font-weight: bold; color: #f87171; text-shadow: 0 2px 4px rgba(0,0,0,0.5); background: rgba(0,0,0,0.45); padding: 10px 24px; border-radius: 14px; border: 2px solid rgba(239, 68, 68, 0.3); pointer-events: none;">
+        🔌 偵測到光線槍：0 支 (請扣動扳機啟用)
+      </div>
+
+      <!-- 對齊提示 -->
+      <div style="margin-bottom: 25px; text-align: center; pointer-events: none;">
+        <span style="font-size: 1rem; color: #fef08a; background: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 14px; border: 1.5px dashed rgba(234,179,8,0.4); text-shadow: 0 1px 3px rgba(0,0,0,0.8); display: inline-block;">💡 建議搭配右上角按鈕切換【全螢幕】，以確保光線槍準心對齊！</span>
+      </div>
+
+      <div class="btn-group">
+        <button id="btn-start-game" class="btn btn-primary">🎮 開始遊戲</button>
+        <button id="btn-go-settings" class="btn btn-secondary">⚙️ 配置設定</button>
+        <button id="btn-go-tutorial" class="btn btn-gray">💡 遊戲教學</button>
+        <button id="btn-go-license" class="btn btn-gray">📝 授權與版權宣告</button>
+      </div>
+    </div>
+
+    <!-- 2. 模式與難度選擇場景 -->
+    <div id="mode-select-scene" class="scene hidden">
+      <h2 class="panel-title">選擇遊戲模式與難度</h2>
+      
+      <!-- 模式選擇 -->
+      <div style="margin-bottom: 20px; display: flex; gap: 15px; width: 560px;">
+        <button id="btn-mode-1p-mouse" class="btn btn-primary" style="flex: 1; font-size: 1.1rem;">1P 滑鼠模式</button>
+        <button id="btn-mode-1p-gun" class="btn btn-secondary" style="flex: 1; font-size: 1.1rem;">1P 光線槍模式</button>
+      </div>
+      <div style="margin-bottom: 25px; display: flex; gap: 15px; width: 560px;">
+        <button id="btn-mode-2p-coop" class="btn btn-accent" style="flex: 1; font-size: 1.1rem;">2P 合作模式 (光線槍)</button>
+        <button id="btn-mode-2p-vs" class="btn btn-gray" style="flex: 1; font-size: 1.1rem;">2P 對抗模式 (光線槍)</button>
+      </div>
+
+      <!-- 難度選擇卡片 -->
+      <div class="grid-select">
+        <div class="difficulty-card selected" data-diff="easy">
+          <div class="diff-name">初級 (Easy)</div>
+          <div class="diff-desc">只出現常見 8 個符號，掉落速度慢，干擾少。適合初學者。</div>
+        </div>
+        <div class="difficulty-card" data-diff="medium">
+          <div class="diff-name">中級 (Normal)</div>
+          <div class="diff-desc">加入更多符號，掉落速度加快，干擾氣球變多。</div>
+        </div>
+        <div class="difficulty-card" data-diff="hard">
+          <div class="diff-name">高級 (Hard)</div>
+          <div class="diff-desc">包含所有 37 個注音，速度極快，氣球晃動，多重干擾。</div>
+        </div>
+        <div class="difficulty-card" data-diff="boss">
+          <div class="diff-name">魔王挑戰 (Boss)</div>
+          <div class="diff-desc">限時連續聽音！魔王會不斷丟出氣球，快速射擊來削減魔王血量！</div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 20px; width: 560px; justify-content: center;">
+        <button id="btn-mode-back" class="btn btn-gray" style="flex: 1;">⬅ 返回首頁</button>
+        <button id="btn-mode-confirm" class="btn btn-primary" style="flex: 1;" disabled>⚔️ 開始挑戰</button>
+      </div>
+    </div>
+
+    <!-- 3. 教學說明場景 -->
+    <div id="tutorial-scene" class="scene hidden">
+      <!-- 右上角 ✕ 關閉按鈕 -->
+      <button id="btn-tutorial-close" title="關閉說明">✕</button>
+
+      <h2 class="panel-title">遊戲說明</h2>
+      
+      <div class="tutorial-box">
+        <h3>🎯 遊戲玩法</h3>
+        <ul>
+          <li>遊戲開始後，系統會唸出一個注音符號（例如：「ㄅ」），請仔細聆聽。</li>
+          <li>多個彩色注音氣球會從上方掉落，其中只有一個是正確答案。</li>
+          <li>用滑鼠或光線槍射擊<span class="chalk-badge-pink">正確的注音氣球</span>來得分並累積連擊 (Combo)！</li>
+          <li>若擊中錯誤氣球，或漏看讓正確氣球掉出警戒線，則會扣除生命值或時間。</li>
+          <li>如果聽不清楚，可射擊或點選上方 HUD 的 <span class="chalk-badge">🔊</span> 按鈕重新聽音。</li>
+        </ul>
+        <br>
+        <h3>⌨ 模式操作與快速鍵</h3>
+        <ul>
+          <li><b>滑鼠模式</b>：使用滑鼠移動瞄準，按滑鼠左鍵進行射擊。</li>
+          <li><b>光線槍模式</b>：支援 <span class="chalk-badge">GUN4IR</span>、<span class="chalk-badge">OpenFIRE</span> 等相容 Gamepad API 模式的光線槍，隨插隨用、<b>免手動校正</b>（強烈建議使用右上角 <span class="chalk-badge">全螢幕</span> 按鈕以確保準心完美對齊）。</li>
+          <li><b>鍵盤快速鍵</b>：遊戲中按下 <span class="chalk-badge">ESC</span> 鍵可隨時暫停；按下 <span class="chalk-badge">Space 空白鍵</span> 可重聽發音。</li>
+        </ul>
+      </div>
+
+      <button id="btn-tutorial-back" class="btn btn-gray" style="width: 200px;">⬅ 返回首頁</button>
+    </div>
+
+    <!-- 3.5 授權與版權宣告場景 -->
+    <div id="license-scene" class="scene hidden">
+      <!-- 右上角 ✕ 關閉按鈕 -->
+      <button id="btn-license-close" title="關閉說明">✕</button>
+
+      <h2 class="panel-title">版權與授權說明</h2>
+      
+      <div class="tutorial-box">
+        <h3>📝 教育部官方語音授權說明</h3>
+        <ul>
+          <li><b>題目語音來源</b>：本遊戲內使用的 37 個注音符號標準朗讀音檔，源自中華民國教育部全球資訊網提供之<span class="chalk-badge-pink">《國語注音符號手冊》</span>官方資源。</li>
+          <li><b>智慧財產權聲明</b>：該語音資源之著作權與所有權均屬中華民國教育部所有。</li>
+          <li><b>授權與使用條款</b>：本專案遵守教育部官方網站之「政府網站資料開放宣告」。語音部分依據創用 CC <span class="chalk-badge">姓名標示-非商業性-禁止改作 3.0 台灣</span> 授權條款，或政府資料開放授權條款進行引用與播放。</li>
+          <li><b>免責聲明</b>：本遊戲為<span class="chalk-badge-pink">完全免費</span>之公益開源教育輔助專案。任何第三方組織或個人，若不當複製、分發或用於商業牟利，所生之版權與法律責任均須自行負責，與本軟體開發者無涉。</li>
+          <li><b>音效與視覺設計</b>：遊戲音效為 Web Audio API 純程式代碼即時合成。擬真小學綠黑板實木邊框介面為 Vanilla CSS 及 Canvas 繪製。</li>
+        </ul>
+      </div>
+
+      <button id="btn-license-back" class="btn btn-gray" style="width: 200px;">⬅ 返回首頁</button>
+    </div>
+    <!-- 4. 遊戲配置設定場景 -->
+    <div id="settings-scene" class="scene hidden">
+      <h2 class="panel-title">⚙️ 遊戲配置設定</h2>
+      
+      <div class="settings-box">
+        <!-- 語音重播間隔設定 -->
+        <div class="settings-item">
+          <span class="settings-label">🔊 語音重複播放間隔：</span>
+          <div class="settings-controls">
+            <button id="btn-setting-repeat-dec" class="btn-adjust" title="減少">-</button>
+            <span id="setting-repeat-val" class="settings-value">3 秒</span>
+            <button id="btn-setting-repeat-inc" class="btn-adjust" title="增加">+</button>
+          </div>
+        </div>
+
+        <!-- 語音音量設定 -->
+        <div class="settings-item">
+          <span class="settings-label">🗣️ 題目語音音量大小：</span>
+          <div class="settings-controls">
+            <button id="btn-setting-voice-dec" class="btn-adjust" title="減少">-</button>
+            <span id="setting-voice-val" class="settings-value">100%</span>
+            <button id="btn-setting-voice-inc" class="btn-adjust" title="增加">+</button>
+          </div>
+        </div>
+
+        <!-- 音效音量設定 -->
+        <div class="settings-item">
+          <span class="settings-label">💥 遊戲音效音量大小：</span>
+          <div class="settings-controls">
+            <button id="btn-setting-sfx-dec" class="btn-adjust" title="減少">-</button>
+            <span id="setting-sfx-val" class="settings-value">80%</span>
+            <button id="btn-setting-sfx-inc" class="btn-adjust" title="增加">+</button>
+          </div>
+        </div>
+
+        <!-- 氣球速度設定 -->
+        <div class="settings-item">
+          <span class="settings-label">🎈 氣球下降速度：</span>
+          <div class="settings-controls">
+            <button id="btn-setting-speed-dec" class="btn-adjust" title="減少">-</button>
+            <span id="setting-speed-val" class="settings-value">標準</span>
+            <button id="btn-setting-speed-inc" class="btn-adjust" title="增加">+</button>
+          </div>
+        </div>
+      </div>
+
+      <button id="btn-settings-save" class="btn btn-primary" style="margin-top: 30px; width: 220px;">💾 確認並返回</button>
+    </div>
+
+    <!-- 5. 暫停場景 -->
+    <div id="pause-scene" class="scene hidden" style="background: rgba(0, 0, 0, 0.75);">
+      <div class="modal-box">
+        <h2 class="modal-title">遊戲暫停</h2>
+        <p style="color: #ccc; margin-bottom: 30px;">休息一下，繼續挑戰吧！</p>
+        
+        <div class="btn-group" style="margin: 0 auto; width: 280px;">
+          <button id="btn-pause-resume" class="btn btn-primary">▶ 繼續遊戲</button>
+          <button id="btn-pause-restart" class="btn btn-accent">🔄 重新挑戰</button>
+          <button id="btn-pause-home" class="btn btn-gray">🏠 放棄回首頁</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. 結算場景 -->
+    <div id="result-scene" class="scene hidden">
+      <div class="modal-box">
+        <h2 id="result-title" class="modal-title">挑戰結束！</h2>
+        
+        <!-- 單人模式結算 -->
+        <div id="single-results" class="results-summary">
+          <div class="result-item">
+            <span>最終得分：</span>
+            <span id="res-score" class="result-val">0</span>
+          </div>
+          <div class="result-item">
+            <span>最大連擊 (Max Combo)：</span>
+            <span id="res-combo" class="result-val">0</span>
+          </div>
+          <div class="result-item">
+            <span>答對題數 / 射擊次數：</span>
+            <span id="res-accuracy-count" class="result-val">0 / 0</span>
+          </div>
+          <div class="result-item">
+            <span>射擊命中率：</span>
+            <span id="res-accuracy" class="result-val">0%</span>
+          </div>
+        </div>
+
+        <!-- 雙人模式結算 -->
+        <div id="coop-vs-results" class="vs-results hidden">
+          <!-- P1 結算 -->
+          <div id="vs-card-p1" class="vs-player-card p1-border">
+            <div id="vs-winner-p1" class="vs-winner-banner hidden">👑 WINNER</div>
+            <h3 style="color: #93c5fd; margin-bottom: 10px;">玩家 1 (藍)</h3>
+            <div class="result-item">
+              <span>得分：</span>
+              <span id="res-p1-score" class="result-val">0</span>
+            </div>
+            <div class="result-item">
+              <span>最大連擊：</span>
+              <span id="res-p1-combo" class="result-val">0</span>
+            </div>
+            <div class="result-item">
+              <span>命中率：</span>
+              <span id="res-p1-acc" class="result-val">0%</span>
+            </div>
+          </div>
+          
+          <!-- P2 結算 -->
+          <div id="vs-card-p2" class="vs-player-card p2-border">
+            <div id="vs-winner-p2" class="vs-winner-banner hidden">👑 WINNER</div>
+            <h3 style="color: #fca5a5; margin-bottom: 10px;">玩家 2 (紅)</h3>
+            <div class="result-item">
+              <span>得分：</span>
+              <span id="res-p2-score" class="result-val">0</span>
+            </div>
+            <div class="result-item">
+              <span>最大連擊：</span>
+              <span id="res-p2-combo" class="result-val">0</span>
+            </div>
+            <div class="result-item">
+              <span>命中率：</span>
+              <span id="res-p2-acc" class="result-val">0%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-group" style="margin: 0 auto; width: 320px; flex-direction: row; gap: 15px;">
+          <button id="btn-result-restart" class="btn btn-primary" style="flex: 1;">🔄 再試一次</button>
+          <button id="btn-result-home" class="btn btn-gray" style="flex: 1;">🏠 回首頁</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 用於選單狀態的光線槍 DOM 準星 -->
+    <div id="dom-crosshair-p1" class="dom-crosshair p1 hidden"></div>
+    <div id="dom-crosshair-p2" class="dom-crosshair p2 hidden"></div>
+  </div>
+
+  <!-- JavaScript 檔案引入 -->
+  <script src="js/config.js"></script>
+  <script src="js/audioManager.js"></script>
+  <script src="js/inputManager.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/symbol.js"></script>
+  <script src="js/particle.js"></script>
+  <script src="js/gameManager.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
