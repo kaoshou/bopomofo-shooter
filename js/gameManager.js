@@ -31,7 +31,7 @@ class GameManager {
 
     // 精進功能屬性
     this.flashDuration = 0;
-    this.questionStartTime = 0;
+
   }
 
   init() {
@@ -163,8 +163,7 @@ class GameManager {
 
     const config = DIFFICULTY_CONFIG[this.selectedDiff];
     
-    // 重設題目出題時間，供新手輔助模式倒數使用
-    this.questionStartTime = Date.now();
+
     
     // 1. 決定正確答案 (從難度允許的名單中隨機挑選)
     const allowed = config.allowedSymbols;
@@ -584,16 +583,7 @@ class GameManager {
 
     // 1. 更新邏輯 (僅在 PLAYING 狀態下更新物理)
     if (this.state === 'PLAYING') {
-      // 新手輔助模式：出題 5 秒後在畫面上提示答案
-      if (typeof gameSettings !== 'undefined' && gameSettings.assistMode) {
-        if (Date.now() - this.questionStartTime > 5000) {
-          const qChar = document.getElementById('question-char');
-          if (qChar && qChar.textContent === '？') {
-            qChar.textContent = this.targetChar;
-            qChar.style.color = 'var(--color-accent-yellow)';
-          }
-        }
-      }
+
 
       // 更新玩家位置
       if (this.p1.inputType === 'mouse') {

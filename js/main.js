@@ -195,17 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
     audioManager.playCorrect();
   });
 
-  // 新手輔助開關
-  document.getElementById('btn-setting-assist-dec').addEventListener('click', () => {
-    gameSettings.assistMode = false;
-    updateSettingsUI();
-    audioManager.playCorrect();
-  });
-  document.getElementById('btn-setting-assist-inc').addEventListener('click', () => {
-    gameSettings.assistMode = true;
-    updateSettingsUI();
-    audioManager.playCorrect();
-  });
+
 
   // 光槍抗抖設定
   document.getElementById('btn-setting-smoothing-dec').addEventListener('click', () => {
@@ -260,8 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (gameSettings.speedScale === 1.3) speedText = '快速';
     document.getElementById('setting-speed-val').textContent = speedText;
 
-    // 新增新手輔助提示對應
-    document.getElementById('setting-assist-val').textContent = gameSettings.assistMode ? '開啟' : '關閉';
+
 
     // 新增光槍抗抖對應
     let smoothText = '標準';

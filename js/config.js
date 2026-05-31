@@ -111,7 +111,6 @@ const gameSettings = {
   sfxVolume: 0.8,    // 音效音量 (0.0 ~ 1.0)
   voiceVolume: 1.0,  // 語音音量 (0.0 ~ 1.0)
   speedScale: 1.0,   // 氣球掉落速度倍率 (0.7: 慢速, 1.0: 標準, 1.3: 快速)
-  assistMode: false, // 新手輔助模式 (預設關閉)
   gunSmoothing: 0.35,// 光線槍瞄準平滑係數 (0.6: 極速, 0.35: 標準, 0.15: 抗抖)
   bgmVolume: 0.3,    // 背景音樂音量大小 (0.0 ~ 1.0, 預設 30%)
   
@@ -124,7 +123,6 @@ const gameSettings = {
         if (typeof parsed.sfxVolume === 'number') this.sfxVolume = parsed.sfxVolume;
         if (typeof parsed.voiceVolume === 'number') this.voiceVolume = parsed.voiceVolume;
         if (typeof parsed.speedScale === 'number') this.speedScale = parsed.speedScale;
-        if (typeof parsed.assistMode === 'boolean') this.assistMode = parsed.assistMode;
         if (typeof parsed.gunSmoothing === 'number') this.gunSmoothing = parsed.gunSmoothing;
         if (typeof parsed.bgmVolume === 'number') this.bgmVolume = parsed.bgmVolume;
       } catch (e) {
@@ -139,7 +137,6 @@ const gameSettings = {
       sfxVolume: this.sfxVolume,
       voiceVolume: this.voiceVolume,
       speedScale: this.speedScale,
-      assistMode: this.assistMode,
       gunSmoothing: this.gunSmoothing,
       bgmVolume: this.bgmVolume
     }));
