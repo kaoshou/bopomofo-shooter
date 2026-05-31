@@ -34,11 +34,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // 全螢幕狀態變化監聽，同步按鈕文字
+  // 全螢幕狀態變化監聽，同步按鈕文字，保留 SVG 圖示
   document.addEventListener('fullscreenchange', () => {
     const btn = document.getElementById('btn-toggle-fullscreen');
     if (btn) {
-      btn.textContent = document.fullscreenElement ? '🖥️ 視窗化' : '🖥️ 切換全螢幕';
+      const span = btn.querySelector('span');
+      if (span) {
+        span.textContent = document.fullscreenElement ? '視窗化' : '全螢幕';
+      } else {
+        btn.textContent = document.fullscreenElement ? '視窗化' : '全螢幕';
+      }
     }
   });
 
