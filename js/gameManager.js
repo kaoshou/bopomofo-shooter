@@ -242,6 +242,14 @@ class GameManager {
     if (this.selectedMode === '1p-webcam' && inputType !== 'webcam') return;
 
     const shooter = playerNum === 1 ? this.p1 : this.p2;
+
+    // 增加射擊冷卻防抖判定 (250ms)，防範 Gamepad 按鍵抖動或 Webcam 手勢雜訊重複觸發射擊
+    const now = Date.now();
+    if (now - shooter.lastShotTime < 250) {
+      console.log(`[射擊防抖] 忽略玩家 ${playerNum} 的重複射擊訊號 (間隔: ${now - shooter.lastShotTime}ms)`);
+      return;
+    }
+
     shooter.triggerShoot();
     audioManager.playShoot();
 
