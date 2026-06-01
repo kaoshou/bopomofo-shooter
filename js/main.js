@@ -247,6 +247,18 @@ document.addEventListener('DOMContentLoaded', () => {
     audioManager.playBGMFeedback();
   });
 
+  // 遊戲時間調整
+  document.getElementById('btn-setting-time-dec').addEventListener('click', () => {
+    gameSettings.gameTime = Math.max(10, gameSettings.gameTime - 10);
+    updateSettingsUI();
+    audioManager.playCorrect();
+  });
+  document.getElementById('btn-setting-time-inc').addEventListener('click', () => {
+    gameSettings.gameTime = Math.min(300, gameSettings.gameTime + 10);
+    updateSettingsUI();
+    audioManager.playCorrect();
+  });
+
   // 確認並儲存
   document.getElementById('btn-settings-save').addEventListener('click', () => {
     gameSettings.save();
@@ -276,6 +288,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 新增背景音樂音量百分比對應
     document.getElementById('setting-bgm-val').textContent = gameSettings.bgmVolume === 0 ? '關閉' : `${Math.round(gameSettings.bgmVolume * 100)}%`;
+
+    // 新增遊戲時間對應
+    document.getElementById('setting-time-val').textContent = `${gameSettings.gameTime} 秒`;
   }
 
   // 6. 綁定暫停 Scene 事件

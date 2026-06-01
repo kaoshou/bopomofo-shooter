@@ -480,8 +480,11 @@ class InputManager {
       if (!this.hands) {
         this.hands = new Hands({
           locateFile: (file) => {
-            // 原引來源：https://cdn.jsdelivr.net/npm/@mediapipe/hands/
-            // 原因用途：將 WebAssembly 與模型資料檔案導向本地 js/lib/mediapipe/ 資料夾加載，以支援無網路（離線）環境遊玩。
+            // 如果是透過本地 file:// 協定直接點開網頁，CORS 會阻擋讀取本地模型檔，此時自動切換至 CDN 來源（CDN 支援跨域 * 標頭）
+            if (window.location.protocol === 'file:') {
+              return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+            }
+            // 否則（如 http://localhost 本地伺服器或 GitHub Pages）使用本地離線模型，以支援完全離線遊玩
             return `js/lib/mediapipe/${file}`;
           }
         });

@@ -120,7 +120,7 @@ class GameManager {
     const config = DIFFICULTY_CONFIG[this.selectedDiff];
     this.lives = config.lives;
     this.maxLives = config.lives;
-    this.timeRemaining = config.timeLimit;
+    this.timeRemaining = (typeof gameSettings !== 'undefined' && gameSettings.gameTime) ? gameSettings.gameTime : config.timeLimit;
     
     // Boss 關血量
     if (this.selectedDiff === 'boss') {

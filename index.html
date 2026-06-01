@@ -212,11 +212,6 @@
           <li>多個彩色注音氣球會從上方掉落，其中只有一個是正確答案。</li>
           <li>用滑鼠或光線槍射擊<span class="chalk-badge-pink">正確的注音氣球</span>來得分並累積連擊 (Combo)！</li>
           <li>若擊中錯誤氣球，或漏看讓正確氣球掉出警戒線，則會扣除生命值或時間。</li>
-          <li>如果聽不清楚，可射擊或點選上方 HUD 的 <span class="chalk-badge"><svg class="icon-svg" viewBox="0 0 24 24"
-                style="width: 1em; height: 1em; vertical-align: middle;">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-              </svg></span> 按鈕重新聽音。</li>
         </ul>
         <br>
         <h3><svg class="icon-svg" viewBox="0 0 24 24">
@@ -265,8 +260,10 @@
           </svg>遊戲開發與設計</h3>
         <ul>
           <li><b>設計與開發</b>：本遊戲由 <span class="chalk-badge-pink">鄭郁翰</span> 設計與開發製作。</li>
-          <li><b>Email</b>：<a href="mailto:kaoshou@gmail.com" style="color: var(--color-accent-yellow); text-decoration: underline;">kaoshou@gmail.com</a></li>
-          <li><b>GitHub</b>：<a href="https://github.com/kaoshou" target="_blank" style="color: var(--color-accent-yellow); text-decoration: underline;">https://github.com/kaoshou</a></li>
+          <li><b>Email</b>：<a href="mailto:kaoshou@gmail.com"
+              style="color: var(--color-accent-yellow); text-decoration: underline;">kaoshou@gmail.com</a></li>
+          <li><b>GitHub</b>：<a href="https://github.com/kaoshou" target="_blank"
+              style="color: var(--color-accent-yellow); text-decoration: underline;">https://github.com/kaoshou</a></li>
           <li><b>開源字型聲明</b>：本專案介面使用由 Google Fonts 提供的開源字型，特此致謝：
             <ul>
               <li><a href="https://fonts.google.com/specimen/Fredoka" target="_blank"
@@ -277,7 +274,9 @@
                 Font License 授權）</li>
             </ul>
           </li>
-          <li><b>手勢體感技術聲明</b>：本專案體感模式採用由 Google 開源的 <a href="https://github.com/google/mediapipe" target="_blank" style="color: var(--color-accent-yellow); text-decoration: underline;">MediaPipe Hands</a> 機器學習手勢識別引擎（本機離線載入）。
+          <li><b>手勢體感技術聲明</b>：本專案體感模式採用由 Google 開源的 <a href="https://github.com/google/mediapipe" target="_blank"
+              style="color: var(--color-accent-yellow); text-decoration: underline;">MediaPipe Hands</a>
+            機器學習手勢識別引擎（本機離線載入）。
             <ul>
               <li><b>授權協議</b>：依據 Apache License 2.0 開源協議授權使用。</li>
               <li><b>主要用途</b>：用於偵測玩家 Webcam 鏡頭影像、即時追蹤手部 21 個關鍵骨架節點，並分析食指準心位置與拇指食指捏合射擊手勢。</li>
@@ -374,6 +373,20 @@
             <button id="btn-setting-bgm-dec" class="btn-adjust" title="減少">-</button>
             <span id="setting-bgm-val" class="settings-value">開啟</span>
             <button id="btn-setting-bgm-inc" class="btn-adjust" title="增加">+</button>
+          </div>
+        </div>
+        <!-- 遊戲時間設定 -->
+        <div class="settings-item">
+          <span class="settings-label" style="display: inline-flex; align-items: center; gap: 8px;">
+            <svg class="icon-svg" viewBox="0 0 24 24" style="stroke: currentColor; fill: none;">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>單局遊戲時間：
+          </span>
+          <div class="settings-controls">
+            <button id="btn-setting-time-dec" class="btn-adjust" title="減少">-</button>
+            <span id="setting-time-val" class="settings-value">60 秒</span>
+            <button id="btn-setting-time-inc" class="btn-adjust" title="增加">+</button>
           </div>
         </div>
         <!-- 氣球速度設定 -->
