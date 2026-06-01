@@ -189,26 +189,25 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // 氣球下降速度調整
+  const speedScales = [0.7, 1.0, 1.3, 1.6, 2.0, 2.5];
   document.getElementById('btn-setting-speed-dec').addEventListener('click', () => {
-    if (gameSettings.speedScale === 0.7) return;
-    if (gameSettings.speedScale === 1.0) {
-      gameSettings.speedScale = 0.7;
-    } else if (gameSettings.speedScale === 1.3) {
-      gameSettings.speedScale = 1.0;
+    const scale = Math.round(gameSettings.speedScale * 10) / 10;
+    const currentIndex = speedScales.indexOf(scale);
+    if (currentIndex > 0) {
+      gameSettings.speedScale = speedScales[currentIndex - 1];
+      updateSettingsUI();
+      audioManager.playCorrect();
     }
-    updateSettingsUI();
-    audioManager.playCorrect();
   });
 
   document.getElementById('btn-setting-speed-inc').addEventListener('click', () => {
-    if (gameSettings.speedScale === 1.3) return;
-    if (gameSettings.speedScale === 1.0) {
-      gameSettings.speedScale = 1.3;
-    } else if (gameSettings.speedScale === 0.7) {
-      gameSettings.speedScale = 1.0;
+    const scale = Math.round(gameSettings.speedScale * 10) / 10;
+    const currentIndex = speedScales.indexOf(scale);
+    if (currentIndex !== -1 && currentIndex < speedScales.length - 1) {
+      gameSettings.speedScale = speedScales[currentIndex + 1];
+      updateSettingsUI();
+      audioManager.playCorrect();
     }
-    updateSettingsUI();
-    audioManager.playCorrect();
   });
 
 
@@ -273,10 +272,16 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('setting-sfx-val').textContent = `${Math.round(gameSettings.sfxVolume * 100)}%`;
     
     // 下降速度文字對應
-    let speedText = '標準';
-    if (gameSettings.speedScale === 0.7) speedText = '慢速';
-    if (gameSettings.speedScale === 1.3) speedText = '快速';
-    document.getElementById('setting-speed-val').textContent = speedText;
+    const scale = Math.round(gameSettings.speedScale * 10) / 10;
+    const speedLabels = {
+      0.7: '慢速',
+      1.0: '標準',
+      1.3: '快速',
+      1.6: '超快',
+      2.0: '極速',
+      2.5: '瘋狂'
+    };
+    document.getElementById('setting-speed-val').textContent = speedLabels[scale] || '標準';
 
 
 

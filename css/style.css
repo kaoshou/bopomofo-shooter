@@ -108,6 +108,33 @@ body {
   background: linear-gradient(135deg, rgba(30, 63, 32, 0.98) 0%, rgba(15, 32, 16, 0.98) 100%);
 }
 
+/* 首頁左下角授權小字 */
+.home-footer-license {
+  position: absolute;
+  bottom: 3.5cqh;
+  left: 2.5cqw;
+  text-align: left;
+  font-size: 1.15cqw;
+  color: rgba(255, 255, 255, 0.35);
+  line-height: 1.5;
+  pointer-events: auto;
+  z-index: 15;
+}
+
+.home-footer-license p {
+  margin: 0;
+}
+
+.home-footer-license a {
+  color: rgba(255, 255, 255, 0.4);
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.home-footer-license a:hover {
+  color: var(--color-accent-yellow);
+}
+
 #home-scene::before {
   content: '';
   position: absolute;

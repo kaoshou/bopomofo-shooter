@@ -80,3 +80,20 @@
 ### 📌 部署注意事項：
 1. **無 CORS 跨來源問題**：當網頁程式與 MediaPipe 本地離線模型（位於 `js/lib/mediapipe/`）部署在同一個伺服器網域下時，瀏覽器會以同源（Same-Origin）方式載入，因此完全不會遇到 CORS 限制。
 2. **必須使用 HTTPS 協定**：由於「鏡頭體感模式」需要存取 Webcam，瀏覽器安全規範規定**必須在 HTTPS 安全連線**（或本地 `http://localhost`）下，才允許網頁請求並啟用相機權限。請確保部署後的網站已啟動 SSL。
+
+---
+
+## 📄 授權條款 (License)
+
+[![CC BY-NC-ND 3.0 TW](https://licensebuttons.net/l/by-nc-nd/3.0/tw/88x31.png)](https://creativecommons.org/licenses/by-nc-nd/3.0/tw/)
+
+本專案之**遊戲程式碼與介面設計**採用 [創用 CC 姓名標示-非商業性-禁止改作 3.0 台灣 授權條款 (CC BY-NC-ND 3.0 TW)](https://creativecommons.org/licenses/by-nc-nd/3.0/tw/) 進行授權。
+
+*   **姓名標示**：您必須給予適當表彰（標示原作者：鄭郁翰）、提供指向本授權條款的連結，並指出是否曾作修改。
+*   **非商業性**：您不得將本素材進行商業目的之使用。
+*   **禁止改作**：若您重混、轉換本素材，或依本素材進行創作，您不得分發修改後的素材。
+
+### 外部資源授權：
+1.  **教育部標準注音發音音檔**：版權歸中華民國教育部所有，本專案依教育部「政府網站資料開放宣告」，引用其《國語注音符號手冊》之語音資源，同樣適用創用 CC 姓名標示-非商業性-禁止改作 3.0 台灣授權條款。
+2.  **開源字型**：Fredoka 及 Noto Sans TC 均採用 SIL Open Font License (OFL) 授權。
+3.  **MediaPipe Hands**：採用 Apache License 2.0 協議授權。
