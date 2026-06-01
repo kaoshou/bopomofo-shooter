@@ -147,8 +147,9 @@
 
       <!-- 模式選擇 -->
       <div style="margin-bottom: 20px; display: flex; gap: 15px; width: 560px;">
-        <button id="btn-mode-1p-mouse" class="btn btn-primary" style="flex: 1; font-size: 1.1rem;">1P 滑鼠模式</button>
-        <button id="btn-mode-1p-gun" class="btn btn-secondary" style="flex: 1; font-size: 1.1rem;">1P 光線槍模式</button>
+        <button id="btn-mode-1p-mouse" class="btn btn-primary" style="flex: 1; font-size: 1rem;">1P 滑鼠模式</button>
+        <button id="btn-mode-1p-gun" class="btn btn-secondary" style="flex: 1; font-size: 1rem;">1P 光線槍模式</button>
+        <button id="btn-mode-1p-webcam" class="btn btn-gray" style="flex: 1; font-size: 1rem;">1P 鏡頭體感</button>
       </div>
       <div style="margin-bottom: 25px; display: flex; gap: 15px; width: 560px;">
         <button id="btn-mode-2p-coop" class="btn btn-accent" style="flex: 1; font-size: 1.1rem;">2P 合作模式 (光線槍)</button>
@@ -231,6 +232,7 @@
           </svg>模式操作與快速鍵</h3>
         <ul>
           <li><b>滑鼠模式</b>：使用滑鼠移動瞄準，按滑鼠左鍵進行射擊。</li>
+          <li><b>鏡頭體感模式</b>：舉起單手手掌對準鏡頭，以<b>「手掌中心」</b>控制準星移動；在空中做出<b>「抓取 (握拳)」</b>的動作即可觸發射擊與按鈕點選，免硬體門檻且動感十足！</li>
           <li><b>光線槍模式</b>：支援 <span class="chalk-badge">GUN4IR</span>、<span class="chalk-badge">OpenFIRE</span> 等相容
             Gamepad API 模式的光線槍，隨插隨用、<b>免手動校正</b>（強烈建議使用右上角 <span class="chalk-badge">全螢幕</span> 按鈕以確保準心完美對齊）。</li>
           <li><b>鍵盤快速鍵</b>：遊戲中按下 <span class="chalk-badge">ESC</span> 鍵可隨時暫停；按下 <span class="chalk-badge">Space
@@ -273,6 +275,12 @@
               <li><a href="https://fonts.google.com/specimen/Noto+Sans+TC" target="_blank"
                   style="color: var(--color-accent-yellow); text-decoration: underline;">Noto Sans TC</a>（依據 SIL Open
                 Font License 授權）</li>
+            </ul>
+          </li>
+          <li><b>手勢體感技術聲明</b>：本專案體感模式採用由 Google 開源的 <a href="https://github.com/google/mediapipe" target="_blank" style="color: var(--color-accent-yellow); text-decoration: underline;">MediaPipe Hands</a> 機器學習手勢識別引擎（本機離線載入）。
+            <ul>
+              <li><b>授權協議</b>：依據 Apache License 2.0 開源協議授權使用。</li>
+              <li><b>主要用途</b>：用於偵測玩家 Webcam 鏡頭影像、即時追蹤手部 21 個關鍵骨架節點，並分析食指準心位置與拇指食指捏合射擊手勢。</li>
             </ul>
           </li>
         </ul>
@@ -531,7 +539,18 @@
     <!-- 用於選單狀態的光線槍 DOM 準星 -->
     <div id="dom-crosshair-p1" class="dom-crosshair p1 hidden"></div>
     <div id="dom-crosshair-p2" class="dom-crosshair p2 hidden"></div>
+
+    <!-- Webcam 體感預覽畫面 -->
+    <div id="webcam-container" class="hidden">
+      <video id="webcam-video" autoplay playsinline muted></video>
+      <canvas id="webcam-preview-canvas" width="160" height="120"></canvas>
+      <div id="webcam-status">載入體感中...</div>
+    </div>
   </div>
+
+  <!-- MediaPipe 體感相關 Library (本地本機離線版，確保無網路連線時仍可加載體感引擎) -->
+  <script src="js/lib/mediapipe/camera_utils.js"></script>
+  <script src="js/lib/mediapipe/hands.js"></script>
 
   <!-- JavaScript 檔案引入 -->
   <script src="js/config.js"></script>

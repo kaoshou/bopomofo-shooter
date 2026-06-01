@@ -1,3 +1,10 @@
+/* 
+ * 引用外部 Google Fonts 線上字型
+ * 來源：https://fonts.google.com/
+ * 原因用途：為遊戲提供 Fredoka (英文) 與 Noto Sans TC (中文) 的美觀字體，改善 HUD 與選單 UI 的視覺質感與字體可讀性。
+ * 離線後備：由於 Noto Sans TC 中文字型體積巨大，為免專案體積膨脹，採用線上加載。
+ *           在完全離線（斷網）遊玩時，瀏覽器會自動回退至本機系統內建字型（如 Windows 下的微軟正黑體 'Microsoft JhengHei'），遊戲功能與排版依然 100% 正常運行。
+ */
 @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Noto+Sans+TC:wght@400;700;900&display=swap');
 
 :root {
@@ -920,6 +927,62 @@ body {
   pointer-events: none;
   box-shadow: none;
   transform: none !important;
+}
+
+/* Webcam 體感預覽容器 */
+#webcam-container {
+  position: absolute;
+  bottom: 25px;
+  right: 25px;
+  width: 160px;
+  height: 120px;
+  border-radius: 12px;
+  border: 2px solid var(--color-accent-yellow);
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 15px rgba(234, 179, 8, 0.4);
+  overflow: hidden;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  transition: opacity 0.3s ease, border-color 0.1s ease, box-shadow 0.1s ease;
+}
+
+#webcam-container.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 捏合射擊時的發光效果 */
+#webcam-container.shooting {
+  border-color: #ef4444;
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.8);
+}
+
+#webcam-video {
+  display: none; /* 隱藏原生影像，改用 canvas 繪製骨架 */
+}
+
+#webcam-preview-canvas {
+  width: 100%;
+  height: 100%;
+  transform: scaleX(-1); /* 水平翻轉以提供鏡像體驗 */
+  object-fit: cover;
+  background-color: #111;
+}
+
+#webcam-status {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--color-accent-yellow);
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+  font-family: var(--font-primary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 

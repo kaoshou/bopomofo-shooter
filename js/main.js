@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const modeButtons = {
     '1p-mouse': document.getElementById('btn-mode-1p-mouse'),
     '1p-gun': document.getElementById('btn-mode-1p-gun'),
+    '1p-webcam': document.getElementById('btn-mode-1p-webcam'),
     '2p-coop': document.getElementById('btn-mode-2p-coop'),
     '2p-vs': document.getElementById('btn-mode-2p-vs')
   };
@@ -60,22 +61,37 @@ document.addEventListener('DOMContentLoaded', () => {
     modeButtons[mode]?.addEventListener('click', () => {
       gameManager.selectedMode = mode;
       
+      // 根據選定模式啟動或關閉 Webcam 體感鏡頭
+      if (mode === '1p-webcam') {
+        inputManager.startWebcam();
+      } else {
+        inputManager.stopWebcam();
+      }
+      
       // 更新按鈕樣式選取狀態
       Object.keys(modeButtons).forEach(m => {
         const btn = modeButtons[m];
-        if (m === mode) {
-          btn.classList.add('btn-primary');
-          btn.classList.remove('btn-gray');
-        } else {
-          btn.classList.remove('btn-primary');
-          btn.classList.add('btn-gray');
+        if (btn) {
+          if (m === mode) {
+            btn.classList.add('btn-primary');
+            btn.classList.remove('btn-gray');
+          } else {
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-gray');
+          }
         }
       });
 
-      // 啟用開始挑戰按鈕
+      // 啟用開始挑戰按鈕 (若是鏡頭體感模式，按鈕狀態與文字交由 inputManager 自行管理)
       const confirmBtn = document.getElementById('btn-mode-confirm');
-      if (confirmBtn) {
+      if (confirmBtn && mode !== '1p-webcam') {
         confirmBtn.disabled = false;
+        confirmBtn.innerHTML = `<svg class="icon-svg" viewBox="0 0 24 24">
+          <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"></polyline>
+          <line x1="13" y1="19" x2="19" y2="13"></line>
+          <line x1="16" y1="16" x2="20" y2="20"></line>
+          <line x1="19" y1="21" x2="21" y2="19"></line>
+        </svg>開始挑戰`;
       }
 
       console.log(`已選擇模式: ${mode}`);

@@ -52,6 +52,13 @@ class GameManager {
   changeState(newState) {
     console.log(`狀態切換: ${this.state} -> ${newState}`);
     
+    // 切換回首頁或非體感相關場景時，自動關閉鏡頭以維護隱私與效能
+    if (newState === 'HOME' || newState === 'LICENSE' || newState === 'TUTORIAL' || newState === 'SETTINGS') {
+      if (typeof inputManager !== 'undefined') {
+        inputManager.stopWebcam();
+      }
+    }
+    
     // 隱藏舊場景 DOM
     this.getSceneElement(this.state)?.classList.add('hidden');
     this.state = newState;
@@ -123,7 +130,7 @@ class GameManager {
 
     // 重設玩家
     this.p1.reset();
-    this.p1.inputType = this.selectedMode === '1p-mouse' ? 'mouse' : 'gamepad';
+    this.p1.inputType = this.selectedMode === '1p-mouse' ? 'mouse' : (this.selectedMode === '1p-webcam' ? 'webcam' : 'gamepad');
     
     this.p2.reset();
     
@@ -232,6 +239,7 @@ class GameManager {
     // 防止玩家輸入與設定的模式不符 (例如 1P 滑鼠模式不處理 Gamepad 射擊，反之亦然)
     if (this.selectedMode === '1p-mouse' && inputType !== 'mouse') return;
     if (this.selectedMode === '1p-gun' && inputType !== 'gamepad') return;
+    if (this.selectedMode === '1p-webcam' && inputType !== 'webcam') return;
 
     const shooter = playerNum === 1 ? this.p1 : this.p2;
     shooter.triggerShoot();
@@ -542,8 +550,17 @@ class GameManager {
     const isMenuState = ['HOME', 'MODE_SELECT', 'TUTORIAL', 'LICENSE', 'SETTINGS', 'PAUSED', 'RESULT'].includes(this.state);
     
     if (isMenuState) {
-      // P1 Gamepad 準星 (使用 Viewport 的 client 座標，解決 CSS 縮放偏差)
-      if (inputManager.p1GamepadIndex !== -1 && inputManager.p1ClientX !== undefined) {
+      // P1 Gamepad 或 Webcam 準星
+      if (this.selectedMode === '1p-webcam' && inputManager.isWebcamActive) {
+        p1Crosshair?.classList.remove('hidden');
+        if (p1Crosshair && this.canvas) {
+          const rect = this.canvas.getBoundingClientRect();
+          const clientX = rect.left + (inputManager.webcamX / GAME_WIDTH) * rect.width;
+          const clientY = rect.top + (inputManager.webcamY / GAME_HEIGHT) * rect.height;
+          p1Crosshair.style.left = `${clientX}px`;
+          p1Crosshair.style.top = `${clientY}px`;
+        }
+      } else if (inputManager.p1GamepadIndex !== -1 && inputManager.p1ClientX !== undefined) {
         p1Crosshair?.classList.remove('hidden');
         if (p1Crosshair) {
           p1Crosshair.style.left = `${inputManager.p1ClientX}px`;
@@ -589,6 +606,9 @@ class GameManager {
       if (this.p1.inputType === 'mouse') {
         this.p1.x = inputManager.mouseX;
         this.p1.y = inputManager.mouseY;
+      } else if (this.p1.inputType === 'webcam') {
+        this.p1.x = inputManager.webcamX || (GAME_WIDTH / 2);
+        this.p1.y = inputManager.webcamY || (GAME_HEIGHT / 2);
       } else {
         this.p1.x = inputManager.p1X || (GAME_WIDTH / 2);
         this.p1.y = inputManager.p1Y || (GAME_HEIGHT / 2);

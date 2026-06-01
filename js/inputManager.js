@@ -36,6 +36,15 @@ class InputManager {
     // 用以追蹤上次偵測到的光槍數量，避免無效重複更新 DOM
     this.lastGunCount = -1;
 
+    // Webcam 體感狀態
+    this.webcamX = GAME_WIDTH / 2;
+    this.webcamY = GAME_HEIGHT / 2;
+    this.isWebcamActive = false;
+    this.hands = null;
+    this.camera = null;
+    this.isPinching = false;
+    this.webcamStream = null;
+
     // 初始化 Gamepad 事件監聽
     window.addEventListener('gamepadconnected', (e) => this.handleGamepadConnect(e));
     window.addEventListener('gamepaddisconnected', (e) => this.handleGamepadDisconnect(e));
@@ -244,7 +253,7 @@ class InputManager {
 
   // 輔助函式：同步模式選擇按鈕的外觀選取狀態
   syncModeButtonsUI(activeMode) {
-    const modes = ['1p-mouse', '1p-gun', '2p-coop', '2p-vs'];
+    const modes = ['1p-mouse', '1p-gun', '1p-webcam', '2p-coop', '2p-vs'];
     modes.forEach(m => {
       const btn = document.getElementById(`btn-mode-${m}`);
       if (btn) {
@@ -424,7 +433,318 @@ class InputManager {
     };
   }
 
+  // 啟動 Webcam 與手勢偵測
+  async startWebcam() {
+    if (this.isWebcamActive) return;
 
+    this.isWebcamReady = false; // 重置就緒狀態
+    const container = document.getElementById('webcam-container');
+    const statusDiv = document.getElementById('webcam-status');
+    const video = document.getElementById('webcam-video');
+    const confirmBtn = document.getElementById('btn-mode-confirm');
+
+    if (container) container.classList.remove('hidden');
+    if (statusDiv) statusDiv.textContent = '載入體感引擎...';
+
+    // 模式選擇確認按鈕置為等待狀態
+    if (confirmBtn) {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = `<svg class="icon-svg" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>📷 載入體感中...`;
+    }
+
+    try {
+      // 1. 取得使用者攝影機權限與串流
+      this.webcamStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 320, height: 240, frameRate: { ideal: 30 } },
+        audio: false
+      });
+      video.srcObject = this.webcamStream;
+      video.play();
+
+      // 權限已獲取，更新按鈕提示請伸出手掌
+      if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = `<svg class="icon-svg" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M12 8v4"></path>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>✋ 請在鏡頭前伸出手掌...`;
+      }
+
+      // 2. 初始化 MediaPipe Hands 體感識別引擎 (開源手勢追蹤技術，來源：Google MediaPipe Hands)
+      // 原因用途：藉由追蹤手掌中心控制準星，並利用握拳/抓取 (Fist Grab) 動作實現免硬體光線槍的體感射擊與點擊。
+      if (!this.hands) {
+        this.hands = new Hands({
+          locateFile: (file) => {
+            // 原引來源：https://cdn.jsdelivr.net/npm/@mediapipe/hands/
+            // 原因用途：將 WebAssembly 與模型資料檔案導向本地 js/lib/mediapipe/ 資料夾加載，以支援無網路（離線）環境遊玩。
+            return `js/lib/mediapipe/${file}`;
+          }
+        });
+
+        this.hands.setOptions({
+          maxNumHands: 1,
+          modelComplexity: 1,
+          minDetectionConfidence: 0.65,
+          minTrackingConfidence: 0.65
+        });
+
+        this.hands.onResults((results) => this.onHandResults(results));
+      }
+
+      // 3. 啟動 MediaPipe Camera 輪詢
+      if (!this.camera) {
+        this.camera = new Camera(video, {
+          onFrame: async () => {
+            if (this.isWebcamActive && this.hands) {
+              await this.hands.send({ image: video });
+            }
+          },
+          width: 320,
+          height: 240
+        });
+      }
+      
+      this.isWebcamActive = true;
+      this.camera.start();
+      console.log('Webcam 體感模式已啟動');
+    } catch (err) {
+      console.error('無法啟動攝影機: ', err);
+      if (statusDiv) statusDiv.textContent = '相機啟動失敗';
+      // 權限被拒或啟動出錯，更新按鈕提示
+      if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = `<svg class="icon-svg" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="15" y1="9" x2="9" y2="15"></line>
+          <line x1="9" y1="9" x2="15" y2="15"></line>
+        </svg>❌ 相機啟動失敗 (請授權)`;
+      }
+    }
+  }
+
+  // 關閉 Webcam，釋放資源
+  stopWebcam() {
+    this.isWebcamActive = false;
+    this.isPinching = false;
+    this.isWebcamReady = false; // 重置就緒狀態
+
+    // 停止相機輪詢
+    if (this.camera) {
+      this.camera.stop();
+    }
+
+    // 關閉影像軌道以關閉鏡頭硬體
+    if (this.webcamStream) {
+      this.webcamStream.getTracks().forEach(track => track.stop());
+      this.webcamStream = null;
+    }
+
+    const video = document.getElementById('webcam-video');
+    if (video) {
+      video.srcObject = null;
+    }
+
+    // 隱藏預覽容器並重設狀態
+    const container = document.getElementById('webcam-container');
+    if (container) {
+      container.classList.add('hidden');
+      container.classList.remove('shooting');
+    }
+
+    // 清除預覽 Canvas
+    const canvas = document.getElementById('webcam-preview-canvas');
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    console.log('Webcam 體感模式已停止並釋放相機資源');
+  }
+
+  // 處理 MediaPipe 傳回的手勢偵測結果
+  onHandResults(results) {
+    if (!this.isWebcamActive) return;
+
+    const canvas = document.getElementById('webcam-preview-canvas');
+    const statusDiv = document.getElementById('webcam-status');
+    const container = document.getElementById('webcam-container');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // 1. 清除畫布並繪製目前的鏡頭影像
+    ctx.clearRect(0, 0, width, height);
+    if (results.image) {
+      ctx.drawImage(results.image, 0, 0, width, height);
+    }
+
+    // 2. 檢查是否偵測到手部
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+      if (statusDiv) statusDiv.textContent = '已連結體感';
+      
+      const landmarks = results.multiHandLandmarks[0];
+      
+      // 當偵測到手掌時，若體感尚未就緒，將確認按鈕重設為就緒狀態並啟用
+      if (!this.isWebcamReady) {
+        this.isWebcamReady = true;
+        const confirmBtn = document.getElementById('btn-mode-confirm');
+        if (confirmBtn) {
+          confirmBtn.disabled = false;
+          confirmBtn.innerHTML = `<svg class="icon-svg" viewBox="0 0 24 24">
+            <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"></polyline>
+            <line x1="13" y1="19" x2="19" y2="13"></line>
+            <line x1="16" y1="16" x2="20" y2="20"></line>
+            <line x1="19" y1="21" x2="21" y2="19"></line>
+          </svg>開始挑戰`;
+        }
+      }
+      const wrist = landmarks[0];
+      const middleMcp = landmarks[9];
+
+      // 3D 空間距離輔助函數
+      const dist3D = (p1, p2) => {
+        return Math.sqrt(
+          Math.pow(p1.x - p2.x, 2) +
+          Math.pow(p1.y - p2.y, 2) +
+          Math.pow(p1.z - p2.z, 2)
+        );
+      };
+
+      // 手掌長度 (手腕到中指根部，做為歸一化比例尺，避免前後移動/縮放影響判定)
+      const palmLength = dist3D(wrist, middleMcp);
+
+      // 手掌中心點定位 (手腕與中指根部的中點)
+      const palmX = (wrist.x + middleMcp.x) / 2;
+      const palmY = (wrist.y + middleMcp.y) / 2;
+
+      // 因為預覽畫面是鏡像，x 需要做水平翻轉以維持同向移動
+      const rawX = (1 - palmX) * GAME_WIDTH;
+      const rawY = palmY * GAME_HEIGHT;
+
+      // 指數移動平均 (EMA) 進行平滑化濾波，使準星定位更穩定
+      const alpha = 0.45; // 平滑度係數
+      this.webcamX = this.webcamX + (rawX - this.webcamX) * alpha;
+      this.webcamY = this.webcamY + (rawY - this.webcamY) * alpha;
+      
+      // 限制座標在遊戲畫面內
+      this.webcamX = Math.max(0, Math.min(GAME_WIDTH, this.webcamX));
+      this.webcamY = Math.max(0, Math.min(GAME_HEIGHT, this.webcamY));
+
+      // 3. 偵測食指、中指、無名指、小指指尖到手腕的距離是否大幅縮小 (即抓取/握拳)
+      const dist8 = dist3D(landmarks[8], wrist) / palmLength;   // 食指尖
+      const dist12 = dist3D(landmarks[12], wrist) / palmLength; // 中指尖
+      const dist16 = dist3D(landmarks[16], wrist) / palmLength; // 無名指尖
+      const dist20 = dist3D(landmarks[20], wrist) / palmLength; // 小指尖
+
+      // 當其中有至少 3 根手指收攏進掌心 (歸一化距離小於 1.15) 時判定為「抓起來 (握拳)」
+      let curledCount = 0;
+      if (dist8 < 1.15) curledCount++;
+      if (dist12 < 1.15) curledCount++;
+      if (dist16 < 1.15) curledCount++;
+      if (dist20 < 1.15) curledCount++;
+
+      const isGrabNow = curledCount >= 3;
+
+      if (isGrabNow) {
+        if (container) container.classList.add('shooting');
+        
+        // 邊緣觸發：前一影格未抓取，此影格抓取，判定為「射擊」
+        if (!this.isPinching) {
+          this.isPinching = true;
+
+          // 若非遊戲中 (選單狀態)，模擬滑鼠點選
+          if (typeof gameManager !== 'undefined' && gameManager.state !== 'PLAYING') {
+            if (this.canvas) {
+              const rect = this.canvas.getBoundingClientRect();
+              const clientX = rect.left + (this.webcamX / GAME_WIDTH) * rect.width;
+              const clientY = rect.top + (this.webcamY / GAME_HEIGHT) * rect.height;
+              this.simulateMenuClick(clientX, clientY);
+            }
+          } else {
+            // 遊戲進行中：正常發射
+            if (this.onShootCallback) {
+              this.onShootCallback(1, this.webcamX, this.webcamY, 'webcam');
+            }
+          }
+        }
+      } else {
+        this.isPinching = false;
+        if (container) container.classList.remove('shooting');
+      }
+
+      // 4. 繪製手部骨架與十字星瞄準標記
+      this.drawSkeleton(ctx, landmarks, width, height, this.isPinching);
+
+    } else {
+      if (statusDiv) statusDiv.textContent = '請伸出手掌';
+      if (container) container.classList.remove('shooting');
+      this.isPinching = false;
+    }
+  }
+
+  // 繪製手部骨架與手掌中心準星在預覽 Canvas 上
+  drawSkeleton(ctx, landmarks, width, height, isPinching) {
+    ctx.strokeStyle = isPinching ? '#f87171' : '#4ade80';
+    ctx.lineWidth = 3;
+    ctx.fillStyle = isPinching ? '#ef4444' : '#86efac';
+
+    // 21 個關節點的骨架連接定義
+    const connections = [
+      [0, 1], [1, 2], [2, 3], [3, 4],       // 大拇指
+      [0, 5], [5, 6], [6, 7], [7, 8],       // 食指
+      [5, 9], [9, 10], [10, 11], [11, 12],  // 中指
+      [9, 13], [13, 14], [14, 15], [15, 16],// 無名指
+      [13, 17], [17, 18], [18, 19], [19, 20],// 小指
+      [0, 17]                               // 手掌底
+    ];
+
+    // 繪製關節線
+    connections.forEach(([i, j]) => {
+      const p1 = landmarks[i];
+      const p2 = landmarks[j];
+      ctx.beginPath();
+      ctx.moveTo(p1.x * width, p1.y * height);
+      ctx.lineTo(p2.x * width, p2.y * height);
+      ctx.stroke();
+    });
+
+    // 繪製關節點
+    for (let i = 0; i < landmarks.length; i++) {
+      const p = landmarks[i];
+      ctx.beginPath();
+      ctx.arc(p.x * width, p.y * height, 3, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
+    // 繪製手掌中心 (準星定位點) 的十字瞄準標記 (提供更具回饋的科技感 UI)
+    const wrist = landmarks[0];
+    const middleMcp = landmarks[9];
+    const palmX = ((wrist.x + middleMcp.x) / 2) * width;
+    const palmY = ((wrist.y + middleMcp.y) / 2) * height;
+
+    ctx.save();
+    ctx.strokeStyle = isPinching ? '#ef4444' : '#facc15';
+    ctx.lineWidth = 2;
+    // 畫中心瞄準圓環
+    ctx.beginPath();
+    ctx.arc(palmX, palmY, 8, 0, 2 * Math.PI);
+    ctx.stroke();
+    // 畫十字線
+    ctx.beginPath();
+    ctx.moveTo(palmX - 12, palmY);
+    ctx.lineTo(palmX + 12, palmY);
+    ctx.moveTo(palmX, palmY - 12);
+    ctx.lineTo(palmX, palmY + 12);
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 // 建立全域輸入管理器實例
