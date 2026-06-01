@@ -1,5 +1,4 @@
 // InputManager - 管理滑鼠與 Gamepad / GUN4IR 輸入
-
 class InputManager {
   constructor() {
     this.canvas = null;
@@ -40,8 +39,8 @@ class InputManager {
     this.webcamX = GAME_WIDTH / 2;
     this.webcamY = GAME_HEIGHT / 2;
     this.isWebcamActive = false;
+    this.webcamStarting = false; // 追蹤攝影機是否正在非同步啟動中
     this.hands = null;
-    this.camera = null;
     this.isPinching = false;
     this.webcamStream = null;
 
@@ -279,7 +278,6 @@ class InputManager {
       const rawY = gp.axes[1];
 
       // 只有在 axes 數值不為精確的 0 (防止出界/歸零彈回中心) 時才更新座標
-      // 移除原有的 0.01 死區判定，避免螢幕正中央被誤判為出界死角
       if (rawX !== 0 || rawY !== 0) {
         // 使用校正邊界將 [-1.0, 1.0] 的 raw 數值轉換到 [0, 1] 比例
         const normX = (rawX - calibration.minX) / (calibration.maxX - calibration.minX);
@@ -435,8 +433,9 @@ class InputManager {
 
   // 啟動 Webcam 與手勢偵測
   async startWebcam() {
-    if (this.isWebcamActive) return;
+    if (this.isWebcamActive || this.webcamStarting) return;
 
+    this.webcamStarting = true; // 標記正在啟動中，防範 Race Condition
     this.isWebcamReady = false; // 重置就緒狀態
     const container = document.getElementById('webcam-container');
     const statusDiv = document.getElementById('webcam-status');
@@ -458,10 +457,19 @@ class InputManager {
 
     try {
       // 1. 取得使用者攝影機權限與串流
-      this.webcamStream = await navigator.mediaDevices.getUserMedia({
+      const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: 320, height: 240, frameRate: { ideal: 30 } },
         audio: false
       });
+
+      // 檢查在 await 的非同步空檔中，使用者是否已返回或呼叫了 stopWebcam()
+      if (!this.webcamStarting) {
+        stream.getTracks().forEach(track => track.stop());
+        console.log('在獲取相機串流後檢測到停止請求，已釋放該相機資源。');
+        return;
+      }
+
+      this.webcamStream = stream;
       video.srcObject = this.webcamStream;
       video.play();
 
@@ -499,23 +507,26 @@ class InputManager {
         this.hands.onResults((results) => this.onHandResults(results));
       }
 
-      // 3. 啟動 MediaPipe Camera 輪詢
-      if (!this.camera) {
-        this.camera = new Camera(video, {
-          onFrame: async () => {
-            if (this.isWebcamActive && this.hands) {
-              await this.hands.send({ image: video });
-            }
-          },
-          width: 320,
-          height: 240
-        });
+      // 再次檢查在初始化模型期間是否呼叫了 stopWebcam()
+      if (!this.webcamStarting) {
+        if (this.webcamStream) {
+          this.webcamStream.getTracks().forEach(track => track.stop());
+          this.webcamStream = null;
+        }
+        video.srcObject = null;
+        console.log('在初始化體感引擎後檢測到停止請求，已關閉相機。');
+        return;
       }
       
       this.isWebcamActive = true;
-      this.camera.start();
+      this.webcamStarting = false; // 啟動完成
+      
+      // 啟動自主偵測循環
+      this.tickWebcam();
+      
       console.log('Webcam 體感模式已啟動');
     } catch (err) {
+      this.webcamStarting = false;
       console.error('無法啟動攝影機: ', err);
       if (statusDiv) statusDiv.textContent = '相機啟動失敗';
       // 權限被拒或啟動出錯，更新按鈕提示
@@ -532,14 +543,10 @@ class InputManager {
 
   // 關閉 Webcam，釋放資源
   stopWebcam() {
+    this.webcamStarting = false; // 取消進行中的啟動
     this.isWebcamActive = false;
     this.isPinching = false;
     this.isWebcamReady = false; // 重置就緒狀態
-
-    // 停止相機輪詢
-    if (this.camera) {
-      this.camera.stop();
-    }
 
     // 關閉影像軌道以關閉鏡頭硬體
     if (this.webcamStream) {
@@ -567,6 +574,30 @@ class InputManager {
     }
 
     console.log('Webcam 體感模式已停止並釋放相機資源');
+  }
+
+  // 自主讀取影格並發送至 MediaPipe 偵測之循環
+  async tickWebcam() {
+    if (!this.isWebcamActive) return;
+
+    const video = document.getElementById('webcam-video');
+    
+    // readyState >= 3 代表 HAVE_FUTURE_DATA（影片有影格可播放且正常進行）
+    if (video && !video.paused && video.readyState >= 3) {
+      if (this.hands) {
+        try {
+          // 等待當前影格偵測完畢，才進行下一影格，防止背景隊列堆積 Lag (與官方 Camera 類別機制一致)
+          await this.hands.send({ image: video });
+        } catch (err) {
+          console.error("MediaPipe 偵測出錯:", err);
+        }
+      }
+    }
+
+    // 再次確認 active，排程下一影格
+    if (this.isWebcamActive) {
+      requestAnimationFrame(() => this.tickWebcam());
+    }
   }
 
   // 處理 MediaPipe 傳回的手勢偵測結果
