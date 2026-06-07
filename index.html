@@ -150,18 +150,42 @@
     <!-- 2. 模式與難度選擇場景 -->
     <div id="mode-select-scene" class="scene hidden">
       <h2 class="panel-title">選擇遊戲模式與難度</h2>
-
-      <!-- 模式選擇 -->
-      <div style="margin-bottom: 20px; display: flex; gap: 15px; width: 560px;">
-        <button id="btn-mode-1p-mouse" class="btn btn-primary" style="flex: 1; font-size: 1rem;">1P 滑鼠模式</button>
-        <button id="btn-mode-1p-gun" class="btn btn-secondary" style="flex: 1; font-size: 1rem;">1P 光線槍模式</button>
+ 
+      <!-- 1P / 2P 大分類切換 -->
+      <div style="margin-bottom: 15px; display: flex; gap: 15px; width: 840px;">
+        <button id="btn-player-type-1p" class="btn btn-primary" style="flex: 1; font-size: 1.1rem;">👤 單人挑戰
+          (1P)</button>
+        <button id="btn-player-type-2p" class="btn btn-gray" style="flex: 1; font-size: 1.1rem;">👥 雙人同樂 (2P)</button>
+      </div>
+ 
+      <!-- 分隔虛線 -->
+      <div style="width: 840px; border-bottom: 1.5px dashed rgba(255,255,255,0.2); margin-bottom: 15px;"></div>
+ 
+      <!-- 1P 模式容器 -->
+      <div id="mode-1p-container" style="margin-bottom: 20px; display: flex; gap: 15px; width: 840px;">
+        <button id="btn-mode-1p-mouse" class="btn btn-gray" style="flex: 1; font-size: 1rem;">1P 滑鼠模式</button>
+        <button id="btn-mode-1p-gun" class="btn btn-gray" style="flex: 1; font-size: 1rem;">1P 光線槍模式</button>
         <button id="btn-mode-1p-webcam" class="btn btn-gray" style="flex: 1; font-size: 1rem;">1P 鏡頭體感</button>
       </div>
-      <div style="margin-bottom: 25px; display: flex; gap: 15px; width: 560px;">
-        <button id="btn-mode-2p-coop" class="btn btn-accent" style="flex: 1; font-size: 1.1rem;">2P 合作模式 (光線槍)</button>
-        <button id="btn-mode-2p-vs" class="btn btn-gray" style="flex: 1; font-size: 1.1rem;">2P 對抗模式 (光線槍)</button>
+ 
+      <!-- 2P 模式容器 (預設隱藏) -->
+      <div id="mode-2p-container" class="hidden"
+        style="margin-bottom: 20px; flex-direction: column; gap: 12px; width: 840px;">
+        <div style="display: flex; gap: 15px; width: 100%;">
+          <button id="btn-mode-2p-coop" class="btn btn-gray" style="flex: 1; font-size: 1rem;">2P 合作 (光線槍)</button>
+          <button id="btn-mode-2p-vs" class="btn btn-gray" style="flex: 1; font-size: 1rem;">2P 對抗 (光線槍)</button>
+        </div>
+        <div style="display: flex; gap: 15px; width: 100%;">
+          <button id="btn-mode-2p-coop-webcam" class="btn btn-gray" style="flex: 1; font-size: 1rem;">2P 合作
+            (鏡頭體感)</button>
+          <button id="btn-mode-2p-vs-webcam" class="btn btn-gray" style="flex: 1; font-size: 1rem;">2P 對抗
+            (鏡頭體感)</button>
+        </div>
       </div>
-
+ 
+      <!-- 分隔虛線 -->
+      <div style="width: 840px; border-bottom: 1.5px dashed rgba(255,255,255,0.2); margin-bottom: 20px;"></div>
+ 
       <!-- 難度選擇卡片 -->
       <div class="grid-select">
         <div class="difficulty-card selected" data-diff="easy">
@@ -181,8 +205,8 @@
           <div class="diff-desc">限時連續聽音！魔王會不斷丟出氣球，快速射擊來削減魔王血量！</div>
         </div>
       </div>
-
-      <div style="display: flex; gap: 20px; width: 560px; justify-content: center;">
+ 
+      <div style="display: flex; gap: 20px; width: 840px; justify-content: center;">
         <button id="btn-mode-back" class="btn btn-gray"
           style="flex: 1; display: inline-flex; align-items: center; justify-content: center;"><svg class="icon-svg"
             viewBox="0 0 24 24">
@@ -216,10 +240,11 @@
         <ul>
           <li>遊戲開始後，系統會唸出一個注音符號（例如：「ㄅ」），請仔細聆聽。</li>
           <li>多個彩色注音氣球會從上方掉落，其中只有一個是正確答案。</li>
-          <li>用滑鼠或光線槍射擊<span class="chalk-badge-pink">正確的注音氣球</span>來得分並累積連擊 (Combo)！</li>
-          <li>若擊中錯誤氣球，或漏看讓正確氣球掉出警戒線，則會扣除生命值或時間。</li>
+          <li>射擊<span class="chalk-badge-pink">正確的注音氣球</span>來得分並累積連擊 (Combo)！</li>
+          <li>若擊中錯誤氣球，或漏掉正確氣球使其落至底部，則會扣除生命值或減少遊戲時間。</li>
         </ul>
         <br>
+
         <h3><svg class="icon-svg" viewBox="0 0 24 24">
             <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
             <line x1="6" y1="8" x2="6" y2="8"></line>
@@ -230,15 +255,112 @@
             <line x1="18" y1="12" x2="18" y2="12"></line>
             <line x1="7" y1="16" x2="17" y2="16"></line>
             <line x1="10" y1="12" x2="14" y2="12"></line>
-          </svg>模式操作與快速鍵</h3>
+          </svg>操作方式與快速鍵</h3>
         <ul>
-          <li><b>滑鼠模式</b>：使用滑鼠移動瞄準，按滑鼠左鍵進行射擊。</li>
-          <li><b>鏡頭體感模式</b>：舉起單手手掌對準鏡頭，以<b>「手掌中心」</b>控制準星移動；在空中做出<b>「抓取 (握拳)」</b>的動作即可觸發射擊與按鈕點選，免硬體門檻且動感十足！</li>
+          <li><b>滑鼠模式</b>：使用滑鼠移動瞄準，按滑鼠左鍵射擊。</li>
+          <li><b>鏡頭體感模式</b>：舉起單手手掌對準鏡頭，以<b>「手掌中心」</b>控制準星移動；在空中快速做出<b>「抓取 (握拳)」</b>的動作即可觸發射擊與按鈕點選，體驗完全免硬體的體感玩法！</li>
           <li><b>光線槍模式</b>：支援 <span class="chalk-badge">GUN4IR</span>、<span class="chalk-badge">OpenFIRE</span> 等相容
-            Gamepad API 模式的光線槍，隨插隨用、<b>免手動校正</b>（強烈建議使用右上角 <span class="chalk-badge">全螢幕</span> 按鈕以確保準心完美對齊）。</li>
+            Gamepad API 的光線槍，隨插隨用、<b>免手動校正</b>（建議開啟 <span class="chalk-badge">全螢幕</span> 以確保準心對齊）。</li>
           <li><b>鍵盤快速鍵</b>：遊戲中按下 <span class="chalk-badge">ESC</span> 鍵可隨時暫停；按下 <span class="chalk-badge">Space
-              空白鍵</span> 可重聽發音。</li>
+              空白鍵</span> 可重聽當前注音發音。</li>
         </ul>
+        <br>
+
+        <h3><svg class="icon-svg" viewBox="0 0 24 24">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>遊戲模式介紹</h3>
+        <ul>
+          <li><b>👤 單人挑戰 (1P)</b>：包含滑鼠、光線槍、鏡頭體感三種輸入，專注於個人反應能力與聽音精準度的練習。</li>
+          <li style="margin-top: 8px;"><b>👥 雙人同樂 (2P)</b>：
+            <ul>
+              <li><b>雙人合作模式</b> (支援光線槍/鏡頭體感)：雙人共同防守，共用分數與生命，累積的 Combo 數會對雙方都有加分加成，考驗默契與分工！</li>
+              <li><b>雙人對抗模式</b> (支援光線槍/鏡頭體感)：雙人互搶答題。搶先擊中正確氣球的玩家獲得分數，且題目會直接切換（防止對方搶答）；擊中錯誤氣球則會扣分，時間結束時分數高者獲勝！</li>
+            </ul>
+          </li>
+        </ul>
+        <br>
+
+        <h3><svg class="icon-svg" viewBox="0 0 24 24">
+            <polygon
+              points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
+            </polygon>
+          </svg>難度等級說明</h3>
+        <ul>
+          <li><b>🟢 初級 (Easy)</b>：
+            <ul>
+              <li><b>注音範圍</b>：僅包含最常見的 8 個注音符號（ㄅ、ㄆ、ㄇ、ㄈ、ㄉ、ㄊ、ㄋ、ㄌ）。</li>
+              <li><b>規則特性</b>：畫面上最多出現 3 個氣球，掉落速度慢，干擾少。初始生命為 <b>5</b>，適合新手玩家練習。</li>
+            </ul>
+          </li>
+          <li style="margin-top: 8px;"><b>🟡 中級 (Normal)</b>：
+            <ul>
+              <li><b>注音範圍</b>：加入更多符號（共 21 個，包含大部分聲母與部分韻母）。</li>
+              <li><b>規則特性</b>：畫面上最多出現 4 個氣球，掉落速度與產生頻率加快，干擾變多。初始生命為 <b>5</b>。</li>
+            </ul>
+          </li>
+          <li style="margin-top: 8px;"><b>🔴 高級 (Hard)</b>：
+            <ul>
+              <li><b>注音範圍</b>：包含所有 37 個注音符號。</li>
+              <li><b>規則特性</b>：畫面上最多出現 6 個氣球，掉落速度極快，氣球會左右飄忽晃動增加瞄準難度。初始生命為 <b>3</b>。</li>
+            </ul>
+          </li>
+          <li style="margin-top: 8px;"><b>🔥 魔王挑戰 (Boss)</b>：
+            <ul>
+              <li><b>注音範圍</b>：包含所有 37 個注音符號。</li>
+              <li><b>規則特性</b>：魔王會瘋狂丟出大量氣球（最多 8 個），且大幅晃動。玩家必須在限時秒數內答對 <b>15 題</b>來削減魔王血量才能將其擊敗！初始生命為 <b>3</b>。</li>
+            </ul>
+          </li>
+        </ul>
+
+        <!-- 全注音符號發音表 -->
+        <div class="bopomofo-table-container">
+          <h3 class="bopomofo-table-title">
+            <svg class="icon-svg" viewBox="0 0 24 24" style="width: 1.3em; height: 1.3em; color: #fef08a;"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+            全注音符號發音表 (點擊直接重聽發音)
+          </h3>
+          <div class="zhuyin-grid">
+            <button class="zhuyin-btn" data-char="ㄅ">ㄅ</button>
+            <button class="zhuyin-btn" data-char="ㄆ">ㄆ</button>
+            <button class="zhuyin-btn" data-char="ㄇ">ㄇ</button>
+            <button class="zhuyin-btn" data-char="ㄈ">ㄈ</button>
+            <button class="zhuyin-btn" data-char="ㄉ">ㄉ</button>
+            <button class="zhuyin-btn" data-char="ㄊ">ㄊ</button>
+            <button class="zhuyin-btn" data-char="ㄋ">ㄋ</button>
+            <button class="zhuyin-btn" data-char="ㄌ">ㄌ</button>
+            <button class="zhuyin-btn" data-char="ㄍ">ㄍ</button>
+            <button class="zhuyin-btn" data-char="ㄎ">ㄎ</button>
+            <button class="zhuyin-btn" data-char="ㄏ">ㄏ</button>
+            <button class="zhuyin-btn" data-char="ㄐ">ㄐ</button>
+            <button class="zhuyin-btn" data-char="ㄑ">ㄑ</button>
+            <button class="zhuyin-btn" data-char="ㄒ">ㄒ</button>
+            <button class="zhuyin-btn" data-char="ㄓ">ㄓ</button>
+            <button class="zhuyin-btn" data-char="ㄔ">ㄔ</button>
+            <button class="zhuyin-btn" data-char="ㄕ">ㄕ</button>
+            <button class="zhuyin-btn" data-char="ㄖ">ㄖ</button>
+            <button class="zhuyin-btn" data-char="ㄗ">ㄗ</button>
+            <button class="zhuyin-btn" data-char="ㄘ">ㄘ</button>
+            <button class="zhuyin-btn" data-char="ㄙ">ㄙ</button>
+            <button class="zhuyin-btn" data-char="ㄧ">ㄧ</button>
+            <button class="zhuyin-btn" data-char="ㄨ">ㄨ</button>
+            <button class="zhuyin-btn" data-char="ㄩ">ㄩ</button>
+            <button class="zhuyin-btn" data-char="ㄚ">ㄚ</button>
+            <button class="zhuyin-btn" data-char="ㄛ">ㄛ</button>
+            <button class="zhuyin-btn" data-char="ㄜ">ㄜ</button>
+            <button class="zhuyin-btn" data-char="ㄝ">ㄝ</button>
+            <button class="zhuyin-btn" data-char="ㄞ">ㄞ</button>
+            <button class="zhuyin-btn" data-char="ㄟ">ㄟ</button>
+            <button class="zhuyin-btn" data-char="ㄠ">ㄠ</button>
+            <button class="zhuyin-btn" data-char="ㄡ">ㄡ</button>
+            <button class="zhuyin-btn" data-char="ㄢ">ㄢ</button>
+            <button class="zhuyin-btn" data-char="ㄣ">ㄣ</button>
+            <button class="zhuyin-btn" data-char="ㄤ">ㄤ</button>
+            <button class="zhuyin-btn" data-char="ㄥ">ㄥ</button>
+            <button class="zhuyin-btn" data-char="ㄦ">ㄦ</button>
+          </div>
+        </div>
       </div>
 
       <button id="btn-tutorial-back" class="btn btn-gray"
@@ -444,6 +566,8 @@
           </div>
         </div>
 
+
+
       </div>
 
       <button id="btn-settings-save" class="btn btn-primary"
@@ -552,6 +676,16 @@
         <!-- 雙人合作團隊默契評價 -->
         <div id="coop-team-evaluation" class="hidden"
           style="margin-bottom: 25px; background: rgba(255, 255, 255, 0.06); border-radius: 16px; padding: 20px; border: 2px dashed rgba(255, 255, 255, 0.15);">
+        </div>
+
+        <!-- 錯題溫習區 -->
+        <div id="mistakes-review-container" class="hidden"
+          style="margin-bottom: 25px; margin-top: 10px; background: rgba(0, 0, 0, 0.25); border-radius: 16px; padding: 15px; border: 1.5px dashed rgba(255, 255, 255, 0.2); width: 100%; box-sizing: border-box;">
+          <h3 class="review-title" style="margin-top: 0; margin-bottom: 12px; font-size: 1.15rem; color: #fef08a; text-align: left; display: inline-flex; align-items: center; gap: 8px; font-weight: bold;">
+            <svg class="icon-svg" viewBox="0 0 24 24" style="width: 1.3em; height: 1.3em; color: #fef08a;"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            錯題溫習區 (點擊卡片重新聽發音)
+          </h3>
+          <div id="mistakes-list" class="mistakes-grid" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-start;"></div>
         </div>
 
         <div class="btn-group" style="margin: 0 auto; width: 320px; flex-direction: row; gap: 15px;">

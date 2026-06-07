@@ -31,7 +31,13 @@ class GameManager {
 
     // 精進功能屬性
     this.flashDuration = 0;
-
+    this.mistakes = [];
+    this.p1FlashAlpha = 0;
+    this.p2FlashAlpha = 0;
+    this.vsTexts = [];
+    
+    // 時間增量更新 (Delta Time) 變數
+    this.lastFrameTime = 0;
   }
 
   init() {
@@ -92,6 +98,22 @@ class GameManager {
       }
       const confirmBtn = document.getElementById('btn-mode-confirm');
       if (confirmBtn) confirmBtn.disabled = true;
+
+      // 重置為 1P 分類顯示，避免上次選單殘留
+      const btnType1p = document.getElementById('btn-player-type-1p');
+      const btnType2p = document.getElementById('btn-player-type-2p');
+      const container1p = document.getElementById('mode-1p-container');
+      const container2p = document.getElementById('mode-2p-container');
+      if (btnType1p && btnType2p && container1p && container2p) {
+        btnType1p.classList.add('btn-primary');
+        btnType1p.classList.remove('btn-gray');
+        btnType2p.classList.add('btn-gray');
+        btnType2p.classList.remove('btn-primary');
+        
+        container1p.style.display = 'flex';
+        container2p.classList.add('hidden');
+        container2p.style.display = 'none';
+      }
     }
 
     if (newState === 'RESULT') {
@@ -116,6 +138,10 @@ class GameManager {
   startGameplay() {
     this.isGameOverTriggered = false;
     particleSystem.reset();
+    this.mistakes = [];
+    this.p1FlashAlpha = 0;
+    this.p2FlashAlpha = 0;
+    this.vsTexts = [];
     
     const config = DIFFICULTY_CONFIG[this.selectedDiff];
     this.lives = config.lives;
@@ -130,7 +156,7 @@ class GameManager {
 
     // 重設玩家
     this.p1.reset();
-    this.p1.inputType = this.selectedMode === '1p-mouse' ? 'mouse' : (this.selectedMode === '1p-webcam' ? 'webcam' : 'gamepad');
+    this.p1.inputType = this.selectedMode === '1p-mouse' ? 'mouse' : ((this.selectedMode === '1p-webcam' || this.selectedMode.endsWith('-webcam')) ? 'webcam' : 'gamepad');
     
     this.p2.reset();
     
@@ -138,7 +164,7 @@ class GameManager {
     const p2Panel = document.getElementById('hud-p2-panel');
     if (this.selectedMode.startsWith('2p')) {
       p2Panel.classList.remove('hidden');
-      this.p2.inputType = 'gamepad';
+      this.p2.inputType = this.selectedMode.endsWith('-webcam') ? 'webcam' : 'gamepad';
     } else {
       p2Panel.classList.add('hidden');
     }
@@ -193,7 +219,6 @@ class GameManager {
     // 4. 決定干擾字
     const distractors = [];
     const availableDistractors = allowed.filter(char => char !== this.targetChar);
-    
     const balloonCount = config.balloonCount;
     while (distractors.length < balloonCount - 1 && availableDistractors.length > 0) {
       const idx = Math.floor(Math.random() * availableDistractors.length);
@@ -221,7 +246,8 @@ class GameManager {
       
       // 隨機速度 (乘上配置設定的掉落速度倍率)
       const baseSpeed = config.speedMin + Math.random() * (config.speedMax - config.speedMin);
-      const speedScale = typeof gameSettings !== 'undefined' ? gameSettings.speedScale : 1.0;
+      let speedScale = typeof gameSettings !== 'undefined' ? gameSettings.speedScale : 1.0;
+
       const speed = baseSpeed * speedScale;
       const isCorrect = (char === this.targetChar);
       const radius = 50; // 氣球半徑
@@ -240,6 +266,8 @@ class GameManager {
     if (this.selectedMode === '1p-mouse' && inputType !== 'mouse') return;
     if (this.selectedMode === '1p-gun' && inputType !== 'gamepad') return;
     if (this.selectedMode === '1p-webcam' && inputType !== 'webcam') return;
+    if (this.selectedMode.endsWith('-webcam') && inputType !== 'webcam') return;
+    if (this.selectedMode.startsWith('2p') && !this.selectedMode.endsWith('-webcam') && inputType !== 'gamepad') return;
 
     const shooter = playerNum === 1 ? this.p1 : this.p2;
 
@@ -283,6 +311,24 @@ class GameManager {
             shooter.score += points;
           }
 
+          // 2P 對抗模式搶答視覺提示
+          const isVs = this.selectedMode && this.selectedMode.includes('vs');
+          if (isVs) {
+            if (playerNum === 1) {
+              this.p1FlashAlpha = 0.45; // 閃爍 P1 半邊
+            } else {
+              this.p2FlashAlpha = 0.45; // 閃爍 P2 半邊
+            }
+            this.vsTexts.push({
+              text: `P${playerNum} 搶答成功! +${points}`,
+              x: b.x,
+              y: b.y - 20,
+              alpha: 1.0,
+              color: playerNum === 1 ? '#60a5fa' : '#f87171',
+              life: 50 // 幀數
+            });
+          }
+
           // 連擊音效或一般正確音效
           if (shooter.combo >= 3) {
             audioManager.playCombo(shooter.combo);
@@ -322,11 +368,19 @@ class GameManager {
             shooter.score = Math.max(0, shooter.score - penalty);
           }
 
+          // 紀錄錯題
+          this.mistakes.push({
+            correct: this.targetChar,
+            selected: b.char,
+            type: 'wrong'
+          });
+
           audioManager.playWrong();
           this.showFeedback('再聽一次！', 'wrong');
           
           // 扣生命值 (對抗模式不扣隊伍生命，只扣分數)
-          if (this.selectedMode !== '2p-vs') {
+          const isVs = this.selectedMode && this.selectedMode.includes('vs');
+          if (!isVs) {
             this.deductLife();
           }
 
@@ -487,7 +541,8 @@ class GameManager {
       const evalEl = document.getElementById('coop-team-evaluation');
       if (evalEl) evalEl.classList.add('hidden');
 
-      if (this.selectedMode === '2p-vs') {
+      const isVs = this.selectedMode && this.selectedMode.includes('vs');
+      if (isVs) {
         // 對抗模式：顯示獲勝者
         if (this.p1.score > this.p2.score) {
           winBanner1.classList.remove('hidden');
@@ -534,6 +589,49 @@ class GameManager {
         }
       }
     }
+
+    // 渲染錯題溫習區
+    const mistakesContainer = document.getElementById('mistakes-review-container');
+    const mistakesList = document.getElementById('mistakes-list');
+    
+    if (mistakesContainer && mistakesList) {
+      if (this.mistakes && this.mistakes.length > 0) {
+        mistakesContainer.classList.remove('hidden');
+        
+        // 進行錯題去重：優先保留「選錯字」而非「漏答」的卡片
+        const uniqueMistakes = [];
+        const seen = new Set();
+        
+        const sortedMistakes = [...this.mistakes].sort((a, b) => {
+          if (a.selected === '漏答' && b.selected !== '漏答') return 1;
+          if (a.selected !== '漏答' && b.selected === '漏答') return -1;
+          return 0;
+        });
+
+        for (const m of sortedMistakes) {
+          if (!seen.has(m.correct)) {
+            seen.add(m.correct);
+            uniqueMistakes.push(m);
+          }
+        }
+        
+        // 限制最多顯示 8 個錯題
+        const displayMistakes = uniqueMistakes.slice(0, 8);
+        
+        mistakesList.innerHTML = displayMistakes.map(m => {
+          const labelText = m.selected === '漏答' ? '漏答' : `射成 ${m.selected}`;
+          return `
+            <div class="mistake-card" data-char="${m.correct}" title="點擊聆聽正確發音">
+              <span class="mistake-char">${m.correct}</span>
+              <span class="mistake-label">${labelText}</span>
+            </div>
+          `;
+        }).join('');
+      } else {
+        mistakesContainer.classList.add('hidden');
+        mistakesList.innerHTML = '';
+      }
+    }
   }
 
   // 暫停與繼續
@@ -558,35 +656,58 @@ class GameManager {
     const isMenuState = ['HOME', 'MODE_SELECT', 'TUTORIAL', 'LICENSE', 'SETTINGS', 'PAUSED', 'RESULT'].includes(this.state);
     
     if (isMenuState) {
-      // P1 Gamepad 或 Webcam 準星
-      if (this.selectedMode === '1p-webcam' && inputManager.isWebcamActive) {
-        p1Crosshair?.classList.remove('hidden');
-        if (p1Crosshair && this.canvas) {
-          const rect = this.canvas.getBoundingClientRect();
-          const clientX = rect.left + (inputManager.webcamX / GAME_WIDTH) * rect.width;
-          const clientY = rect.top + (inputManager.webcamY / GAME_HEIGHT) * rect.height;
-          p1Crosshair.style.left = `${clientX}px`;
-          p1Crosshair.style.top = `${clientY}px`;
+      // 判定是否為體感模式
+      const isWebcamMode = (this.selectedMode === '1p-webcam' || (this.selectedMode && this.selectedMode.endsWith('-webcam')));
+      
+      if (isWebcamMode && inputManager.isWebcamActive) {
+        // P1 體感準星
+        if (inputManager.isWebcamP1Active && inputManager.p1WebcamX !== undefined) {
+          p1Crosshair?.classList.remove('hidden');
+          if (p1Crosshair && this.canvas) {
+            const rect = this.canvas.getBoundingClientRect();
+            const clientX = rect.left + (inputManager.p1WebcamX / GAME_WIDTH) * rect.width;
+            const clientY = rect.top + (inputManager.p1WebcamY / GAME_HEIGHT) * rect.height;
+            p1Crosshair.style.left = `${clientX}px`;
+            p1Crosshair.style.top = `${clientY}px`;
+          }
+        } else {
+          p1Crosshair?.classList.add('hidden');
         }
-      } else if (inputManager.p1GamepadIndex !== -1 && inputManager.p1ClientX !== undefined) {
-        p1Crosshair?.classList.remove('hidden');
-        if (p1Crosshair) {
-          p1Crosshair.style.left = `${inputManager.p1ClientX}px`;
-          p1Crosshair.style.top = `${inputManager.p1ClientY}px`;
-        }
-      } else {
-        p1Crosshair?.classList.add('hidden');
-      }
 
-      // P2 Gamepad 準星
-      if (inputManager.p2GamepadIndex !== -1 && inputManager.p2ClientX !== undefined) {
-        p2Crosshair?.classList.remove('hidden');
-        if (p2Crosshair) {
-          p2Crosshair.style.left = `${inputManager.p2ClientX}px`;
-          p2Crosshair.style.top = `${inputManager.p2ClientY}px`;
+        // P2 體感準星
+        if (this.selectedMode && this.selectedMode.startsWith('2p') && inputManager.isWebcamP2Active && inputManager.p2WebcamX !== undefined) {
+          p2Crosshair?.classList.remove('hidden');
+          if (p2Crosshair && this.canvas) {
+            const rect = this.canvas.getBoundingClientRect();
+            const clientX = rect.left + (inputManager.p2WebcamX / GAME_WIDTH) * rect.width;
+            const clientY = rect.top + (inputManager.p2WebcamY / GAME_HEIGHT) * rect.height;
+            p2Crosshair.style.left = `${clientX}px`;
+            p2Crosshair.style.top = `${clientY}px`;
+          }
+        } else {
+          p2Crosshair?.classList.add('hidden');
         }
       } else {
-        p2Crosshair?.classList.add('hidden');
+        // 非體感模式，使用原本的 Gamepad/光槍 DOM 準星
+        if (inputManager.p1GamepadIndex !== -1 && inputManager.p1ClientX !== undefined) {
+          p1Crosshair?.classList.remove('hidden');
+          if (p1Crosshair) {
+            p1Crosshair.style.left = `${inputManager.p1ClientX}px`;
+            p1Crosshair.style.top = `${inputManager.p1ClientY}px`;
+          }
+        } else {
+          p1Crosshair?.classList.add('hidden');
+        }
+
+        if (inputManager.p2GamepadIndex !== -1 && inputManager.p2ClientX !== undefined) {
+          p2Crosshair?.classList.remove('hidden');
+          if (p2Crosshair) {
+            p2Crosshair.style.left = `${inputManager.p2ClientX}px`;
+            p2Crosshair.style.top = `${inputManager.p2ClientY}px`;
+          }
+        } else {
+          p2Crosshair?.classList.add('hidden');
+        }
       }
     } else {
       // 遊戲中或校正中，隱藏 DOM 準星
@@ -599,6 +720,16 @@ class GameManager {
   loop() {
     // 使用 requestAnimationFrame 不斷執行
     requestAnimationFrame(() => this.loop());
+
+    // 計算 Delta Time 時間差
+    const now = performance.now();
+    if (!this.lastFrameTime) this.lastFrameTime = now;
+    let dt = now - this.lastFrameTime;
+    this.lastFrameTime = now;
+
+    // 限制合理的 dt 範圍 (例如 0.1ms 到 100ms)，防範背景分頁凍結重返時造成瞬移
+    if (dt > 100) dt = 16.67;
+    const dtScale = dt / 16.67;
 
     // 全天候更新輸入狀態，確保所有選單可由光槍控制
     inputManager.update();
@@ -614,32 +745,49 @@ class GameManager {
       if (this.p1.inputType === 'mouse') {
         this.p1.x = inputManager.mouseX;
         this.p1.y = inputManager.mouseY;
+        this.p1.isPinching = false;
       } else if (this.p1.inputType === 'webcam') {
-        this.p1.x = inputManager.webcamX || (GAME_WIDTH / 2);
-        this.p1.y = inputManager.webcamY || (GAME_HEIGHT / 2);
+        this.p1.x = inputManager.p1WebcamX || (GAME_WIDTH / 2);
+        this.p1.y = inputManager.p1WebcamY || (GAME_HEIGHT / 2);
+        this.p1.isPinching = !!inputManager.isPinchingP1;
       } else {
         this.p1.x = inputManager.p1X || (GAME_WIDTH / 2);
         this.p1.y = inputManager.p1Y || (GAME_HEIGHT / 2);
+        this.p1.isPinching = false;
       }
 
       if (this.selectedMode.startsWith('2p')) {
-        this.p2.x = inputManager.p2X || (GAME_WIDTH / 2);
-        this.p2.y = inputManager.p2Y || (GAME_HEIGHT / 2);
+        if (this.p2.inputType === 'webcam') {
+          this.p2.x = inputManager.p2WebcamX || (GAME_WIDTH / 2);
+          this.p2.y = inputManager.p2WebcamY || (GAME_HEIGHT / 2);
+          this.p2.isPinching = !!inputManager.isPinchingP2;
+        } else {
+          this.p2.x = inputManager.p2X || (GAME_WIDTH / 2);
+          this.p2.y = inputManager.p2Y || (GAME_HEIGHT / 2);
+          this.p2.isPinching = false;
+        }
       }
 
       // 更新粒子特效
-      particleSystem.update();
+      particleSystem.update(dtScale);
 
       // 更新氣球位置並檢查越界
       let correctCharMissed = false;
       
       for (let i = this.balloons.length - 1; i >= 0; i--) {
         const b = this.balloons[i];
-        const status = b.update();
+        const status = b.update(dtScale);
         
         if (status === 'missed') {
           if (b.isCorrect) {
             correctCharMissed = true; // 正確答案氣球漏答了
+            
+            // 紀錄漏答
+            this.mistakes.push({
+              correct: this.targetChar,
+              selected: '漏答',
+              type: 'miss'
+            });
           }
           this.balloons.splice(i, 1);
         } else if (!b.active) {
@@ -657,7 +805,8 @@ class GameManager {
         audioManager.playWrong();
         this.showFeedback('漏答了！', 'wrong');
 
-        if (this.selectedMode !== '2p-vs') {
+        const isVs = this.selectedMode && this.selectedMode.includes('vs');
+        if (!isVs) {
           this.deductLife();
         }
 
@@ -671,6 +820,21 @@ class GameManager {
         audioManager.playZhuyin(this.targetChar);
         this.lastVoicePlayTime = Date.now();
       }
+
+      // 更新對抗模式搶答漂浮文字
+      for (let i = this.vsTexts.length - 1; i >= 0; i--) {
+        const vt = this.vsTexts[i];
+        vt.y -= 1.0; // 往上飄移
+        vt.life--;
+        vt.alpha = Math.max(0, vt.life / 50); // 隨生命遞減 Alpha
+        if (vt.life <= 0) {
+          this.vsTexts.splice(i, 1);
+        }
+      }
+
+      // 遞減兩側閃爍透明度
+      if (this.p1FlashAlpha > 0) this.p1FlashAlpha -= 0.015;
+      if (this.p2FlashAlpha > 0) this.p2FlashAlpha -= 0.015;
     }
 
     // 2. 渲染畫面 (只要不是完全隱藏 Canvas 都要畫，或是每幀清除重繪)
@@ -695,6 +859,40 @@ class GameManager {
 
       // 繪製粒子
       particleSystem.draw(this.ctx);
+
+      // 繪製對抗模式搶答兩側閃光
+      if (this.state === 'PLAYING') {
+        if (this.p1FlashAlpha > 0) {
+          const gradP1 = this.ctx.createLinearGradient(0, 0, GAME_WIDTH * 0.4, 0);
+          gradP1.addColorStop(0, `rgba(59, 130, 246, ${this.p1FlashAlpha})`);
+          gradP1.addColorStop(1, 'rgba(59, 130, 246, 0)');
+          this.ctx.fillStyle = gradP1;
+          this.ctx.fillRect(0, 0, GAME_WIDTH * 0.4, GAME_HEIGHT);
+        }
+        if (this.p2FlashAlpha > 0) {
+          const gradP2 = this.ctx.createLinearGradient(GAME_WIDTH, 0, GAME_WIDTH * 0.6, 0);
+          gradP2.addColorStop(0, `rgba(239, 68, 68, ${this.p2FlashAlpha})`);
+          gradP2.addColorStop(1, 'rgba(239, 68, 68, 0)');
+          this.ctx.fillStyle = gradP2;
+          this.ctx.fillRect(GAME_WIDTH * 0.6, 0, GAME_WIDTH * 0.4, GAME_HEIGHT);
+        }
+
+        // 繪製搶答漂浮文字
+        if (this.vsTexts.length > 0) {
+          this.ctx.save();
+          this.vsTexts.forEach(vt => {
+            this.ctx.globalAlpha = vt.alpha;
+            this.ctx.font = 'bold 26px Noto Sans TC';
+            this.ctx.fillStyle = vt.color;
+            this.ctx.textAlign = 'center';
+            this.ctx.strokeStyle = '#000000';
+            this.ctx.lineWidth = 5;
+            this.ctx.strokeText(vt.text, vt.x, vt.y);
+            this.ctx.fillText(vt.text, vt.x, vt.y);
+          });
+          this.ctx.restore();
+        }
+      }
 
       // 繪製玩家準星 (1P 永遠繪製)
       this.p1.drawCrosshair(this.ctx);

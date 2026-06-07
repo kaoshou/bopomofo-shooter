@@ -259,9 +259,9 @@ body {
 
 .grid-select {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 20px;
-  width: 560px;
+  width: 840px;
   margin-bottom: 30px;
 }
 
@@ -1021,6 +1021,108 @@ body {
   pointer-events: none;
   font-family: var(--font-primary);
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 錯題溫習與注音表樣式 */
+.mistakes-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-start;
+  margin-top: 5px;
+  width: 100%;
+}
+
+.mistake-card {
+  background: rgba(239, 68, 68, 0.15);
+  border: 2px solid rgba(239, 68, 68, 0.5);
+  border-radius: 12px;
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 80px;
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+}
+
+.mistake-card:hover {
+  transform: translateY(-3px);
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.8);
+  box-shadow: 0 6px 12px rgba(239, 68, 68, 0.3);
+}
+
+.mistake-card:active {
+  transform: translateY(-1px);
+}
+
+.mistake-char {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.mistake-label {
+  font-size: 0.8rem;
+  color: #fca5a5;
+  font-weight: 500;
+}
+
+/* 注音表樣式 */
+.bopomofo-table-container {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1.5px dashed rgba(255, 255, 255, 0.15);
+}
+
+.bopomofo-table-title {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: var(--color-accent-yellow);
+  margin-bottom: 15px;
+  text-align: left;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.zhuyin-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.zhuyin-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 1.6rem;
+  font-weight: 900;
+  padding: 12px 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: var(--font-primary);
+  text-shadow: 0 2px 3px rgba(0,0,0,0.3);
+  box-shadow: inset 0 0 10px rgba(255,255,255,0.02);
+}
+
+.zhuyin-btn:hover {
+  transform: scale(1.08);
+  background: rgba(254, 240, 138, 0.1);
+  border-color: var(--color-accent-yellow);
+  color: var(--color-accent-yellow);
+  box-shadow: 0 0 15px rgba(234, 179, 8, 0.3);
+}
+
+.zhuyin-btn:active {
+  transform: scale(0.96);
 }
 
 

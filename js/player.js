@@ -19,6 +19,7 @@ class Player {
     // 射擊動畫控制
     this.lastShotTime = 0;
     this.recoilDuration = 150; // 射擊回彈動畫持續時間 (ms)
+    this.isPinching = false;   // 體感是否處於捏合狀態
   }
 
   // 重設統計資料
@@ -32,6 +33,7 @@ class Player {
     this.x = GAME_WIDTH / 2;
     this.y = GAME_HEIGHT / 2;
     this.lastShotTime = 0;
+    this.isPinching = false;
   }
 
   // 取得精準度
@@ -73,14 +75,18 @@ class Player {
       scale = 1.0 + (1.0 - t) * 0.6;
     }
 
+    const isGrabActive = (this.inputType === 'webcam' && this.isPinching);
+    let baseRadius = 20 * scale;
+    if (isGrabActive) {
+      baseRadius *= 0.7; // 體感捏合時外框收縮
+    }
+
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.strokeStyle = this.color;
-    ctx.lineWidth = 3;
-    ctx.shadowBlur = 8;
+    ctx.lineWidth = isGrabActive ? 6 : 3; // 捏合時線條加粗
+    ctx.shadowBlur = isGrabActive ? 20 : 8; // 捏合時發光增強
     ctx.shadowColor = this.color;
-
-    const baseRadius = 20 * scale;
 
     if (this.id === 1) {
       // 1P 準星：同心圓 + 十字線
@@ -89,22 +95,23 @@ class Player {
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.arc(0, 0, baseRadius * 0.4, 0, Math.PI * 2);
+      // 捏合時中心實心圓變大
+      ctx.arc(0, 0, baseRadius * (isGrabActive ? 0.75 : 0.4), 0, Math.PI * 2);
       ctx.fillStyle = this.color;
       ctx.fill();
 
       ctx.beginPath();
       // 上
       ctx.moveTo(0, -baseRadius * 1.5);
-      ctx.lineTo(0, -baseRadius * 0.6);
+      ctx.lineTo(0, -baseRadius * (isGrabActive ? 0.8 : 0.6));
       // 下
-      ctx.moveTo(0, baseRadius * 0.6);
+      ctx.moveTo(0, baseRadius * (isGrabActive ? 0.8 : 0.6));
       ctx.lineTo(0, baseRadius * 1.5);
       // 左
       ctx.moveTo(-baseRadius * 1.5, 0);
-      ctx.lineTo(-baseRadius * 0.6, 0);
+      ctx.lineTo(-baseRadius * (isGrabActive ? 0.8 : 0.6), 0);
       // 右
-      ctx.moveTo(baseRadius * 0.6, 0);
+      ctx.moveTo(baseRadius * (isGrabActive ? 0.8 : 0.6), 0);
       ctx.lineTo(baseRadius * 1.5, 0);
       ctx.stroke();
 
@@ -130,9 +137,9 @@ class Player {
       ctx.lineTo(baseRadius * 1.3, 0);
       ctx.stroke();
 
-      // 中心小圓點
+      // 中心小圓點 (捏合時變為實心大圓)
       ctx.beginPath();
-      ctx.arc(0, 0, 3, 0, Math.PI * 2);
+      ctx.arc(0, 0, isGrabActive ? baseRadius * 0.75 : 3, 0, Math.PI * 2);
       ctx.fillStyle = this.color;
       ctx.fill();
 

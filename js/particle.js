@@ -23,21 +23,21 @@ class Particle {
     this.gravity = 0.12;
   }
 
-  update() {
-    this.x += this.vx;
-    this.y += this.vy;
+  update(dtScale = 1.0) {
+    this.x += this.vx * dtScale;
+    this.y += this.vy * dtScale;
     
     // 套用重力
-    this.vy += this.gravity;
+    this.vy += this.gravity * dtScale;
     
     // 隨機阻力 (微幅減速)
-    this.vx *= 0.98;
-    this.vy *= 0.98;
+    this.vx *= Math.pow(0.98, dtScale);
+    this.vy *= Math.pow(0.98, dtScale);
     
     // 減少透明度與大小
-    this.alpha -= this.decay;
+    this.alpha -= this.decay * dtScale;
     if (this.radius > 0.2) {
-      this.radius -= 0.05;
+      this.radius -= 0.05 * dtScale;
     }
     
     return this.alpha > 0 && this.radius > 0;
@@ -84,10 +84,10 @@ class ParticleSystem {
     }
   }
 
-  // 更新所有粒子
-  update() {
+  // 更新所有粒子 (支援 dtScale)
+  update(dtScale = 1.0) {
     for (let i = this.particles.length - 1; i >= 0; i--) {
-      const active = this.particles[i].update();
+      const active = this.particles[i].update(dtScale);
       if (!active) {
         this.particles.splice(i, 1);
       }

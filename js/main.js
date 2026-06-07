@@ -48,12 +48,55 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // 3. 綁定模式與難度選擇 Scene 事件
+  const btnType1p = document.getElementById('btn-player-type-1p');
+  const btnType2p = document.getElementById('btn-player-type-2p');
+  const container1p = document.getElementById('mode-1p-container');
+  const container2p = document.getElementById('mode-2p-container');
+
+  btnType1p.addEventListener('click', () => {
+    btnType1p.classList.add('btn-primary');
+    btnType1p.classList.remove('btn-gray');
+    btnType2p.classList.add('btn-gray');
+    btnType2p.classList.remove('btn-primary');
+
+    container1p.style.display = 'flex';
+    container2p.classList.add('hidden');
+    container2p.style.display = 'none';
+
+    // 重設所選模式與確認按鈕
+    gameManager.selectedMode = null;
+    inputManager.syncModeButtonsUI(null);
+    inputManager.stopWebcam();
+    const confirmBtn = document.getElementById('btn-mode-confirm');
+    if (confirmBtn) confirmBtn.disabled = true;
+  });
+
+  btnType2p.addEventListener('click', () => {
+    btnType2p.classList.add('btn-primary');
+    btnType2p.classList.remove('btn-gray');
+    btnType1p.classList.add('btn-gray');
+    btnType1p.classList.remove('btn-primary');
+
+    container2p.classList.remove('hidden');
+    container2p.style.display = 'flex';
+    container1p.style.display = 'none';
+
+    // 重設所選模式與確認按鈕
+    gameManager.selectedMode = null;
+    inputManager.syncModeButtonsUI(null);
+    inputManager.stopWebcam();
+    const confirmBtn = document.getElementById('btn-mode-confirm');
+    if (confirmBtn) confirmBtn.disabled = true;
+  });
+
   const modeButtons = {
     '1p-mouse': document.getElementById('btn-mode-1p-mouse'),
     '1p-gun': document.getElementById('btn-mode-1p-gun'),
     '1p-webcam': document.getElementById('btn-mode-1p-webcam'),
     '2p-coop': document.getElementById('btn-mode-2p-coop'),
-    '2p-vs': document.getElementById('btn-mode-2p-vs')
+    '2p-vs': document.getElementById('btn-mode-2p-vs'),
+    '2p-coop-webcam': document.getElementById('btn-mode-2p-coop-webcam'),
+    '2p-vs-webcam': document.getElementById('btn-mode-2p-vs-webcam')
   };
 
   // 點擊模式按鈕切換
@@ -62,19 +105,19 @@ document.addEventListener('DOMContentLoaded', () => {
       gameManager.selectedMode = mode;
       
       // 根據選定模式啟動或關閉 Webcam 體感鏡頭
-      if (mode === '1p-webcam') {
+      if (mode === '1p-webcam' || mode.endsWith('-webcam')) {
         inputManager.startWebcam();
       } else {
         inputManager.stopWebcam();
       }
       
-      // 更新按鈕樣式選取狀態
+      // 更新按鈕樣式選取狀態 (未選中一律還原為灰色)
       Object.keys(modeButtons).forEach(m => {
         const btn = modeButtons[m];
         if (btn) {
           if (m === mode) {
             btn.classList.add('btn-primary');
-            btn.classList.remove('btn-gray');
+            btn.classList.remove('btn-gray', 'btn-accent');
           } else {
             btn.classList.remove('btn-primary');
             btn.classList.add('btn-gray');
@@ -84,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // 啟用開始挑戰按鈕 (若是鏡頭體感模式，按鈕狀態與文字交由 inputManager 自行管理)
       const confirmBtn = document.getElementById('btn-mode-confirm');
-      if (confirmBtn && mode !== '1p-webcam') {
+      if (confirmBtn && !mode.endsWith('-webcam')) {
         confirmBtn.disabled = false;
         confirmBtn.innerHTML = `<svg class="icon-svg" viewBox="0 0 24 24">
           <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"></polyline>
@@ -320,6 +363,28 @@ document.addEventListener('DOMContentLoaded', () => {
     gameManager.changeState('HOME');
   });
 
+  // 錯題溫習卡片點擊事件委派 (點擊字卡重聽正確讀音)
+  document.getElementById('mistakes-list')?.addEventListener('click', (e) => {
+    const card = e.target.closest('.mistake-card');
+    if (card) {
+      const char = card.getAttribute('data-char');
+      if (char) {
+        audioManager.playZhuyin(char);
+      }
+    }
+  });
+
+  // 注音發音表按鈕點擊事件委派 (點選播放注音發音)
+  document.querySelector('.zhuyin-grid')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.zhuyin-btn');
+    if (btn) {
+      const char = btn.getAttribute('data-char');
+      if (char) {
+        audioManager.playZhuyin(char);
+      }
+    }
+  });
+
   // 8. 綁定 HUD 內的按鈕事件
   document.getElementById('btn-replay-audio').addEventListener('click', (e) => {
     e.stopPropagation(); // 阻止點擊穿透到 Canvas 射擊
@@ -353,4 +418,5 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   });
+
 });

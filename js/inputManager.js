@@ -44,6 +44,20 @@ class InputManager {
     this.isPinching = false;
     this.webcamStream = null;
 
+    // 雙人體感追蹤變數
+    this.p1WebcamX = GAME_WIDTH / 2;
+    this.p1WebcamY = GAME_HEIGHT / 2;
+    this.p2WebcamX = GAME_WIDTH / 2;
+    this.p2WebcamY = GAME_HEIGHT / 2;
+    this.p1WebcamTargetX = GAME_WIDTH / 2;
+    this.p1WebcamTargetY = GAME_HEIGHT / 2;
+    this.p2WebcamTargetX = GAME_WIDTH / 2;
+    this.p2WebcamTargetY = GAME_HEIGHT / 2;
+    this.isPinchingP1 = false;
+    this.isPinchingP2 = false;
+    this.isWebcamP1Active = false;
+    this.isWebcamP2Active = false;
+
     // 初始化 Gamepad 事件監聽
     window.addEventListener('gamepadconnected', (e) => this.handleGamepadConnect(e));
     window.addEventListener('gamepaddisconnected', (e) => this.handleGamepadDisconnect(e));
@@ -164,6 +178,29 @@ class InputManager {
     if (this.p2GamepadIndex !== -1 && gps[this.p2GamepadIndex]) {
       this.processGamepadInput(2, gps[this.p2GamepadIndex]);
     }
+
+    // Webcam 體感準星更新 (60 FPS 平滑插值)
+    if (this.isWebcamActive) {
+      const alpha = 0.25; // 60 FPS 下的平滑係數，能防手震並提供即時跟隨
+      
+      if (this.isWebcamP1Active) {
+        this.p1WebcamX = this.p1WebcamX + (this.p1WebcamTargetX - this.p1WebcamX) * alpha;
+        this.p1WebcamY = this.p1WebcamY + (this.p1WebcamTargetY - this.p1WebcamY) * alpha;
+        this.p1WebcamX = Math.max(0, Math.min(GAME_WIDTH, this.p1WebcamX));
+        this.p1WebcamY = Math.max(0, Math.min(GAME_HEIGHT, this.p1WebcamY));
+        
+        // 相容單人模式變數
+        this.webcamX = this.p1WebcamX;
+        this.webcamY = this.p1WebcamY;
+      }
+      
+      if (this.isWebcamP2Active) {
+        this.p2WebcamX = this.p2WebcamX + (this.p2WebcamTargetX - this.p2WebcamX) * alpha;
+        this.p2WebcamY = this.p2WebcamY + (this.p2WebcamTargetY - this.p2WebcamY) * alpha;
+        this.p2WebcamX = Math.max(0, Math.min(GAME_WIDTH, this.p2WebcamX));
+        this.p2WebcamY = Math.max(0, Math.min(GAME_HEIGHT, this.p2WebcamY));
+      }
+    }
   }
 
   // 偵測目前已連接且啟用的光槍數量
@@ -212,6 +249,11 @@ class InputManager {
     const btn1pGun = document.getElementById('btn-mode-1p-gun');
     const btn2pCoop = document.getElementById('btn-mode-2p-coop');
     const btn2pVs = document.getElementById('btn-mode-2p-vs');
+    const btn2pCoopWebcam = document.getElementById('btn-mode-2p-coop-webcam');
+    const btn2pVsWebcam = document.getElementById('btn-mode-2p-vs-webcam');
+    
+    if (btn2pCoopWebcam) btn2pCoopWebcam.disabled = false;
+    if (btn2pVsWebcam) btn2pVsWebcam.disabled = false;
     
     if (btnMouse && btn1pGun && btn2pCoop && btn2pVs) {
       if (count === 0) {
@@ -221,7 +263,10 @@ class InputManager {
         btn2pVs.disabled = true;
         
         // 若當前所選模式需要光線槍，重設為未選取，防止玩家硬闖
-        if (typeof gameManager !== 'undefined' && gameManager.selectedMode && gameManager.selectedMode !== '1p-mouse') {
+        if (typeof gameManager !== 'undefined' && gameManager.selectedMode && 
+            gameManager.selectedMode !== '1p-mouse' && 
+            gameManager.selectedMode !== '1p-webcam' && 
+            !gameManager.selectedMode.endsWith('-webcam')) {
           gameManager.selectedMode = null;
           this.syncModeButtonsUI(null);
           const confirmBtn = document.getElementById('btn-mode-confirm');
@@ -233,8 +278,10 @@ class InputManager {
         btn2pCoop.disabled = true;
         btn2pVs.disabled = true;
         
-        // 若當前所選模式為雙人模式，重設為未選取
-        if (typeof gameManager !== 'undefined' && gameManager.selectedMode && gameManager.selectedMode.startsWith('2p')) {
+        // 若當前所選模式為雙人光槍模式，重設為未選取 (雙人體感模式不用重設)
+        if (typeof gameManager !== 'undefined' && gameManager.selectedMode && 
+            gameManager.selectedMode.startsWith('2p') && 
+            !gameManager.selectedMode.endsWith('-webcam')) {
           gameManager.selectedMode = null;
           this.syncModeButtonsUI(null);
           const confirmBtn = document.getElementById('btn-mode-confirm');
@@ -252,16 +299,16 @@ class InputManager {
 
   // 輔助函式：同步模式選擇按鈕的外觀選取狀態
   syncModeButtonsUI(activeMode) {
-    const modes = ['1p-mouse', '1p-gun', '1p-webcam', '2p-coop', '2p-vs'];
+    const modes = ['1p-mouse', '1p-gun', '1p-webcam', '2p-coop', '2p-vs', '2p-coop-webcam', '2p-vs-webcam'];
     modes.forEach(m => {
       const btn = document.getElementById(`btn-mode-${m}`);
       if (btn) {
         if (m === activeMode) {
           btn.classList.add('btn-primary');
-          btn.classList.remove('btn-gray');
+          btn.classList.remove('btn-gray', 'btn-accent');
         } else {
           btn.classList.remove('btn-primary');
-          btn.classList.add('btn-gray');
+          btn.classList.add('btn-gray'); // 沒選中通通是灰色
         }
       }
     });
@@ -497,15 +544,16 @@ class InputManager {
           }
         });
 
-        this.hands.setOptions({
-          maxNumHands: 1,
-          modelComplexity: 1,
-          minDetectionConfidence: 0.65,
-          minTrackingConfidence: 0.65
-        });
-
         this.hands.onResults((results) => this.onHandResults(results));
       }
+
+      const isDouble = typeof gameManager !== 'undefined' && gameManager.selectedMode && gameManager.selectedMode.startsWith('2p');
+      this.hands.setOptions({
+        maxNumHands: isDouble ? 2 : 1,
+        modelComplexity: 0, // 降低模型複雜度以顯著提高執行效能，減少體感模式下的 CPU 消耗與延遲
+        minDetectionConfidence: 0.55,
+        minTrackingConfidence: 0.55
+      });
 
       // 再次檢查在初始化模型期間是否呼叫了 stopWebcam()
       if (!this.webcamStarting) {
@@ -546,6 +594,10 @@ class InputManager {
     this.webcamStarting = false; // 取消進行中的啟動
     this.isWebcamActive = false;
     this.isPinching = false;
+    this.isPinchingP1 = false;
+    this.isPinchingP2 = false;
+    this.isWebcamP1Active = false;
+    this.isWebcamP2Active = false;
     this.isWebcamReady = false; // 重置就緒狀態
 
     // 關閉影像軌道以關閉鏡頭硬體
@@ -619,11 +671,13 @@ class InputManager {
       ctx.drawImage(results.image, 0, 0, width, height);
     }
 
+    const isDoubleMode = typeof gameManager !== 'undefined' && gameManager.selectedMode && gameManager.selectedMode.startsWith('2p');
+
     // 2. 檢查是否偵測到手部
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-      if (statusDiv) statusDiv.textContent = '已連結體感';
-      
-      const landmarks = results.multiHandLandmarks[0];
+      if (statusDiv) {
+        statusDiv.textContent = `已連結體感 (${results.multiHandLandmarks.length}人)`;
+      }
       
       // 當偵測到手掌時，若體感尚未就緒，將確認按鈕重設為就緒狀態並啟用
       if (!this.isWebcamReady) {
@@ -639,8 +693,6 @@ class InputManager {
           </svg>開始挑戰`;
         }
       }
-      const wrist = landmarks[0];
-      const middleMcp = landmarks[9];
 
       // 3D 空間距離輔助函數
       const dist3D = (p1, p2) => {
@@ -651,83 +703,203 @@ class InputManager {
         );
       };
 
-      // 手掌長度 (手腕到中指根部，做為歸一化比例尺，避免前後移動/縮放影響判定)
-      const palmLength = dist3D(wrist, middleMcp);
+      // 解析所有偵測到的手部資料
+      const detectedHands = [];
+      for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+        const landmarks = results.multiHandLandmarks[i];
+        const wrist = landmarks[0];
+        const middleMcp = landmarks[9];
 
-      // 手掌中心點定位 (手腕與中指根部的中點)
-      const palmX = (wrist.x + middleMcp.x) / 2;
-      const palmY = (wrist.y + middleMcp.y) / 2;
+        const palmLength = dist3D(wrist, middleMcp);
+        const palmX = (wrist.x + middleMcp.x) / 2;
+        const palmY = (wrist.y + middleMcp.y) / 2;
 
-      // 因為預覽畫面是鏡像，x 需要做水平翻轉以維持同向移動
-      const rawX = (1 - palmX) * GAME_WIDTH;
-      const rawY = palmY * GAME_HEIGHT;
+        // 水平翻轉以提供鏡像體驗，並轉換為遊戲邏輯座標 (1280x720)
+        const rawX = (1 - palmX) * GAME_WIDTH;
+        const rawY = palmY * GAME_HEIGHT;
 
-      // 指數移動平均 (EMA) 進行平滑化濾波，使準星定位更穩定
-      const alpha = 0.45; // 平滑度係數
-      this.webcamX = this.webcamX + (rawX - this.webcamX) * alpha;
-      this.webcamY = this.webcamY + (rawY - this.webcamY) * alpha;
-      
-      // 限制座標在遊戲畫面內
-      this.webcamX = Math.max(0, Math.min(GAME_WIDTH, this.webcamX));
-      this.webcamY = Math.max(0, Math.min(GAME_HEIGHT, this.webcamY));
+        // 偵測食指、中指、無名指、小指是否收攏進掌心 (握拳抓取)
+        const dist8 = dist3D(landmarks[8], wrist) / palmLength;
+        const dist12 = dist3D(landmarks[12], wrist) / palmLength;
+        const dist16 = dist3D(landmarks[16], wrist) / palmLength;
+        const dist20 = dist3D(landmarks[20], wrist) / palmLength;
 
-      // 3. 偵測食指、中指、無名指、小指指尖到手腕的距離是否大幅縮小 (即抓取/握拳)
-      const dist8 = dist3D(landmarks[8], wrist) / palmLength;   // 食指尖
-      const dist12 = dist3D(landmarks[12], wrist) / palmLength; // 中指尖
-      const dist16 = dist3D(landmarks[16], wrist) / palmLength; // 無名指尖
-      const dist20 = dist3D(landmarks[20], wrist) / palmLength; // 小指尖
+        let curledCount = 0;
+        if (dist8 < 1.15) curledCount++;
+        if (dist12 < 1.15) curledCount++;
+        if (dist16 < 1.15) curledCount++;
+        if (dist20 < 1.15) curledCount++;
 
-      // 當其中有至少 3 根手指收攏進掌心 (歸一化距離小於 1.15) 時判定為「抓起來 (握拳)」
-      let curledCount = 0;
-      if (dist8 < 1.15) curledCount++;
-      if (dist12 < 1.15) curledCount++;
-      if (dist16 < 1.15) curledCount++;
-      if (dist20 < 1.15) curledCount++;
+        const isGrabNow = curledCount >= 3;
 
-      const isGrabNow = curledCount >= 3;
+        detectedHands.push({
+          rawX,
+          rawY,
+          isGrabNow,
+          landmarks
+        });
+      }
 
-      if (isGrabNow) {
-        if (container) container.classList.add('shooting');
-        
-        // 邊緣觸發：前一影格未抓取，此影格抓取，判定為「射擊」
-        if (!this.isPinching) {
-          this.isPinching = true;
+      // 將手部分配給 P1 與 P2
+      let p1Hand = null;
+      let p2Hand = null;
 
-          // 若非遊戲中 (選單狀態)，模擬滑鼠點選
-          if (typeof gameManager !== 'undefined' && gameManager.state !== 'PLAYING') {
-            if (this.canvas) {
-              const rect = this.canvas.getBoundingClientRect();
-              const clientX = rect.left + (this.webcamX / GAME_WIDTH) * rect.width;
-              const clientY = rect.top + (this.webcamY / GAME_HEIGHT) * rect.height;
-              this.simulateMenuClick(clientX, clientY);
+      if (detectedHands.length === 2) {
+        if (isDoubleMode) {
+          // 偵測到兩隻手，先以 X 座標區分左右
+          let leftHand = detectedHands[0].rawX < detectedHands[1].rawX ? detectedHands[0] : detectedHands[1];
+          let rightHand = detectedHands[0].rawX < detectedHands[1].rawX ? detectedHands[1] : detectedHands[0];
+          
+          // 若雙方前一幀都活躍，使用歐式距離來匹配，避免因為手部短暫交叉或雜訊導致 P1/P2 瞬間互換
+          if (this.isWebcamP1Active && this.isWebcamP2Active) {
+            const costNormal = Math.hypot(leftHand.rawX - this.p1WebcamX, leftHand.rawY - this.p1WebcamY) +
+                               Math.hypot(rightHand.rawX - this.p2WebcamX, rightHand.rawY - this.p2WebcamY);
+            const costSwapped = Math.hypot(rightHand.rawX - this.p1WebcamX, rightHand.rawY - this.p1WebcamY) +
+                                Math.hypot(leftHand.rawX - this.p2WebcamX, leftHand.rawY - this.p2WebcamY);
+            
+            if (costSwapped < costNormal) {
+              p1Hand = rightHand;
+              p2Hand = leftHand;
+            } else {
+              p1Hand = leftHand;
+              p2Hand = rightHand;
             }
           } else {
-            // 遊戲進行中：正常發射
-            if (this.onShootCallback) {
-              this.onShootCallback(1, this.webcamX, this.webcamY, 'webcam');
-            }
+            p1Hand = leftHand;
+            p2Hand = rightHand;
           }
+        } else {
+          // 單人模式，只取第一隻手
+          p1Hand = detectedHands[0];
+        }
+      } else if (detectedHands.length === 1) {
+        const hand = detectedHands[0];
+        if (isDoubleMode) {
+          // 混合 Tracking 演算法：優先考量上一幀的距離，若無上一幀或距離過遠，再以中線劃分
+          const distP1 = Math.hypot(hand.rawX - this.p1WebcamX, hand.rawY - this.p1WebcamY);
+          const distP2 = Math.hypot(hand.rawX - this.p2WebcamX, hand.rawY - this.p2WebcamY);
+          
+          const P1_ACTIVE = this.isWebcamP1Active;
+          const P2_ACTIVE = this.isWebcamP2Active;
+
+          if (P1_ACTIVE && P2_ACTIVE) {
+            if (distP1 < distP2) p1Hand = hand;
+            else p2Hand = hand;
+          } else if (P1_ACTIVE && !P2_ACTIVE) {
+            // 如果只有 P1 活躍，但這隻手突然出現在畫面極右側且距離 P1 很遠，這可能是 P2 剛把手舉起來
+            if (hand.rawX > GAME_WIDTH * 0.6 && distP1 > GAME_WIDTH * 0.3) {
+              p2Hand = hand;
+            } else {
+              p1Hand = hand;
+            }
+          } else if (!P1_ACTIVE && P2_ACTIVE) {
+            // 如果只有 P2 活躍，但這隻手突然出現在畫面極左側且距離 P2 很遠，這可能是 P1 剛把手舉起來
+            if (hand.rawX < GAME_WIDTH * 0.4 && distP2 > GAME_WIDTH * 0.3) {
+              p1Hand = hand;
+            } else {
+              p2Hand = hand;
+            }
+          } else {
+            // 兩者皆不活躍，直接用中線劃分
+            if (hand.rawX < GAME_WIDTH * 0.5) p1Hand = hand;
+            else p2Hand = hand;
+          }
+        } else {
+          // 單人模式，一律歸為 P1
+          p1Hand = hand;
+        }
+      }
+
+      // 3. 更新 P1 狀態
+      if (p1Hand) {
+        this.isWebcamP1Active = true;
+        this.p1WebcamTargetX = Math.max(0, Math.min(GAME_WIDTH, p1Hand.rawX));
+        this.p1WebcamTargetY = Math.max(0, Math.min(GAME_HEIGHT, p1Hand.rawY));
+
+        if (p1Hand.isGrabNow) {
+          if (!this.isPinchingP1) {
+            this.isPinchingP1 = true;
+            this.triggerWebcamShoot(1, this.p1WebcamX, this.p1WebcamY);
+          }
+        } else {
+          this.isPinchingP1 = false;
+        }
+        this.isPinching = this.isPinchingP1;
+      } else {
+        this.isWebcamP1Active = false;
+        this.isPinchingP1 = false;
+      }
+
+      // 4. 更新 P2 狀態
+      if (p2Hand && isDoubleMode) {
+        this.isWebcamP2Active = true;
+        this.p2WebcamTargetX = Math.max(0, Math.min(GAME_WIDTH, p2Hand.rawX));
+        this.p2WebcamTargetY = Math.max(0, Math.min(GAME_HEIGHT, p2Hand.rawY));
+
+        if (p2Hand.isGrabNow) {
+          if (!this.isPinchingP2) {
+            this.isPinchingP2 = true;
+            this.triggerWebcamShoot(2, this.p2WebcamX, this.p2WebcamY);
+          }
+        } else {
+          this.isPinchingP2 = false;
         }
       } else {
-        this.isPinching = false;
+        this.isWebcamP2Active = false;
+        this.isPinchingP2 = false;
+      }
+
+      // 更新 Webcam 容器的射擊發光效果
+      const isAnyPinching = this.isPinchingP1 || this.isPinchingP2;
+      if (isAnyPinching) {
+        if (container) container.classList.add('shooting');
+      } else {
         if (container) container.classList.remove('shooting');
       }
 
-      // 4. 繪製手部骨架與十字星瞄準標記
-      this.drawSkeleton(ctx, landmarks, width, height, this.isPinching);
+      // 5. 繪製骨架與瞄準器
+      if (p1Hand) {
+        this.drawSkeleton(ctx, p1Hand.landmarks, width, height, this.isPinchingP1, 1);
+      }
+      if (p2Hand && isDoubleMode) {
+        this.drawSkeleton(ctx, p2Hand.landmarks, width, height, this.isPinchingP2, 2);
+      }
 
     } else {
-      if (statusDiv) statusDiv.textContent = '請伸出手掌';
+      if (statusDiv) statusDiv.textContent = isDoubleMode ? '請伸出雙手' : '請伸出手掌';
       if (container) container.classList.remove('shooting');
       this.isPinching = false;
+      this.isPinchingP1 = false;
+      this.isPinchingP2 = false;
+      this.isWebcamP1Active = false;
+      this.isWebcamP2Active = false;
+    }
+  }
+
+  // 抽離的 Webcam 射擊觸發方法，整合選單模擬點擊與遊戲射擊
+  triggerWebcamShoot(playerNum, webcamX, webcamY) {
+    if (typeof gameManager !== 'undefined' && gameManager.state !== 'PLAYING') {
+      if (this.canvas) {
+        const rect = this.canvas.getBoundingClientRect();
+        const clientX = rect.left + (webcamX / GAME_WIDTH) * rect.width;
+        const clientY = rect.top + (webcamY / GAME_HEIGHT) * rect.height;
+        this.simulateMenuClick(clientX, clientY);
+      }
+    } else {
+      if (this.onShootCallback) {
+        this.onShootCallback(playerNum, webcamX, webcamY, 'webcam');
+      }
     }
   }
 
   // 繪製手部骨架與手掌中心準星在預覽 Canvas 上
-  drawSkeleton(ctx, landmarks, width, height, isPinching) {
-    ctx.strokeStyle = isPinching ? '#f87171' : '#4ade80';
+  drawSkeleton(ctx, landmarks, width, height, isPinching, playerNum = 1) {
+    const pColor = playerNum === 1 ? '#3b82f6' : '#ef4444'; // 1P 藍色, 2P 紅色
+    const pFill = playerNum === 1 ? '#60a5fa' : '#f87171';
+
+    ctx.strokeStyle = isPinching ? '#f87171' : pColor;
     ctx.lineWidth = 3;
-    ctx.fillStyle = isPinching ? '#ef4444' : '#86efac';
+    ctx.fillStyle = isPinching ? '#ef4444' : pFill;
 
     // 21 個關節點的骨架連接定義
     const connections = [
@@ -777,6 +949,14 @@ class InputManager {
     ctx.moveTo(palmX, palmY - 12);
     ctx.lineTo(palmX, palmY + 12);
     ctx.stroke();
+
+    // 繪製 "1P" 或 "2P" 標籤
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 10px Fredoka';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`${playerNum}P`, palmX, palmY - 14);
+
     ctx.restore();
   }
 }

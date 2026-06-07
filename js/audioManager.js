@@ -9,10 +9,28 @@ class AudioManager {
     this.bgmTimer = null;
     this.bgmSequence = 0;
     
+    // 初始化區間播放與配置
+    this.audioSegments = {};
+    this.segmentTimeout = null;
+    this.loadAudioSegments();
+    
     // 初始化語音
     this.initVoice();
     if (this.speechSynthesis && this.speechSynthesis.onvoiceschanged !== undefined) {
       this.speechSynthesis.onvoiceschanged = () => this.initVoice();
+    }
+  }
+
+  // 非同步載入注音組合語音區間配置
+  async loadAudioSegments() {
+    try {
+      const response = await fetch('audio/audio_segments.json');
+      if (response.ok) {
+        this.audioSegments = await response.json();
+        console.log("🔊 成功載入注音組合語音區間配置。");
+      }
+    } catch (e) {
+      console.warn("無法載入 audio_segments.json，將播放完整發音檔：", e);
     }
   }
 
@@ -40,6 +58,12 @@ class AudioManager {
 
   // 播放注音讀音 (優先使用本機教育部官方標準音檔，TTS 為輔)
   playZhuyin(char) {
+    // 優先清除之前的區間播放計時器，防止多重定時器衝突
+    if (this.segmentTimeout) {
+      clearTimeout(this.segmentTimeout);
+      this.segmentTimeout = null;
+    }
+
     // 教育部官方音檔順序 (聲母 21 -> 韻母 13 -> 介母 3)
     const ZHUYIN_AUDIO_MAP = {
       'ㄅ': 1, 'ㄆ': 2, 'ㄇ': 3, 'ㄈ': 4, 'ㄉ': 5, 'ㄊ': 6, 'ㄋ': 7, 'ㄌ': 8,
@@ -51,34 +75,78 @@ class AudioManager {
     };
     
     const audioNum = ZHUYIN_AUDIO_MAP[char];
+    let audioUrl = '';
     
     if (audioNum) {
-      // 改用本機專案目錄的音檔路徑，實現 100% 離線執行且載入零延遲
-      const audioUrl = `audio/F${audioNum}.WAV`;
+      audioUrl = `audio/F${audioNum}.WAV`;
+    } else {
+      audioUrl = `audio/${char}.wav`;
+    }
+    
+    // 停止先前正在播的語音，防止多重發音混疊
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio = null;
+    }
 
-      // 停止先前正在播的語音，防止多重發音混疊
-      if (this.currentAudio) {
-        this.currentAudio.pause();
-        this.currentAudio = null;
-      }
+    // 同步暫停 TTS fallback 避免混音
+    if (this.speechSynthesis) {
+      this.speechSynthesis.cancel();
+    }
 
-      // 同步暫停 TTS fallback 避免混音
-      if (this.speechSynthesis) {
-        this.speechSynthesis.cancel();
-      }
-
-      // 動態建立 Audio 物件進行高音質標準朗讀
-      this.currentAudio = new Audio(audioUrl);
-      this.currentAudio.volume = typeof gameSettings !== 'undefined' ? gameSettings.voiceVolume : 1.0;
+    // 動態建立 Audio 物件進行高音質標準朗讀
+    this.currentAudio = new Audio(audioUrl);
+    this.currentAudio.volume = typeof gameSettings !== 'undefined' ? gameSettings.voiceVolume : 1.0;
+    
+    // 檢查是否有配置好的播放區間 (主要是組合音檔)
+    const segment = this.audioSegments[char];
+    if (segment) {
+      const start = segment.start;
+      const end = segment.end;
+      const duration = end - start;
       
+      // 在元資料載入後跳轉至 start
+      this.currentAudio.addEventListener('loadedmetadata', () => {
+        if (this.currentAudio) {
+          this.currentAudio.currentTime = start;
+        }
+      });
+      
+      // 若檔案早已快取/加載好，我們也嘗試跳轉
+      if (this.currentAudio.readyState >= 1) {
+        this.currentAudio.currentTime = start;
+      }
+      
+      // 使用 timeupdate 事件做為保險監聽暫停
+      const checkEnd = () => {
+        if (this.currentAudio && this.currentAudio.currentTime >= end) {
+          this.currentAudio.pause();
+          this.currentAudio.removeEventListener('timeupdate', checkEnd);
+        }
+      };
+      this.currentAudio.addEventListener('timeupdate', checkEnd);
+
       this.currentAudio.play().then(() => {
-        console.log(`成功播放教育部標準發音檔 [F${audioNum}.WAV] (${char})`);
+        console.log(`成功播放標準發音檔區間 [${audioUrl}] (${char}) 自 ${start}s 至 ${end}s`);
+        
+        // 設定精確的 setTimeout 定時器在播放完指定長度後自動暫停
+        this.segmentTimeout = setTimeout(() => {
+          if (this.currentAudio) {
+            this.currentAudio.pause();
+          }
+        }, duration * 1000);
       }).catch(err => {
-        console.warn(`本機發音檔播放失敗， fallback 使用 TTS 合成音`, err);
+        console.warn(`本機發音檔區間 [${audioUrl}] 播放失敗， fallback 使用 TTS 合成音`, err);
         this.playZhuyinTTS(char);
       });
     } else {
-      this.playZhuyinTTS(char);
+      // 若無區間配置（如單音），則播放完整發音檔
+      this.currentAudio.play().then(() => {
+        console.log(`成功播放標準發音檔 [${audioUrl}] (${char})`);
+      }).catch(err => {
+        console.warn(`本機發音檔 [${audioUrl}] 播放失敗， fallback 使用 TTS 合成音`, err);
+        this.playZhuyinTTS(char);
+      });
     }
   }
 
