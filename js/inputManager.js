@@ -44,6 +44,17 @@ class InputManager {
     this.isPinching = false;
     this.webcamStream = null;
 
+    // 用於自動防卡死與自我修復的輔助變數
+    this.consecutiveWebcamTimeouts = 0;
+    this.lastVideoTime = -1;
+    this.sameTimeCount = 0;
+
+    // 用於防搶控制權與無縫換手的多目標軌跡鎖定變數
+    this.p1TrackId = null;
+    this.p2TrackId = null;
+    this.trackedHands = {};
+    this.nextTrackId = 1;
+
     // 雙人體感追蹤變數
     this.p1WebcamX = GAME_WIDTH / 2;
     this.p1WebcamY = GAME_HEIGHT / 2;
@@ -478,6 +489,40 @@ class InputManager {
     };
   }
 
+  // 初始化 MediaPipe Hands 偵測引擎
+  initHands() {
+    if (this.hands) {
+      try {
+        this.hands.close();
+      } catch (e) {
+        console.error("關閉舊的 Hands 實例失敗:", e);
+      }
+      this.hands = null;
+    }
+
+    this.hands = new Hands({
+      locateFile: (file) => {
+        // 如果是透過本地 file:// 協定直接點開網頁，CORS 會阻擋讀取本地模型檔，此時自動切換至 CDN 來源（CDN 支援跨域 * 標頭）
+        if (window.location.protocol === 'file:') {
+          return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        }
+        // 否則（如 http://localhost 本地伺服器或 GitHub Pages）使用本地離線模型，以支援完全離線遊玩
+        return `js/lib/mediapipe/${file}`;
+      }
+    });
+
+    this.hands.onResults((results) => this.onHandResults(results));
+
+    const isDouble = typeof gameManager !== 'undefined' && gameManager.selectedMode && gameManager.selectedMode.startsWith('2p');
+    this.hands.setOptions({
+      maxNumHands: isDouble ? 2 : 1,
+      modelComplexity: 0, // 降低模型複雜度以顯著提高執行效能，減少體感模式下的 CPU 消耗與延遲
+      minDetectionConfidence: 0.55,
+      minTrackingConfidence: 0.55
+    });
+    console.log("MediaPipe Hands 偵測引擎已初始化");
+  }
+
   // 啟動 Webcam 與手勢偵測
   async startWebcam() {
     if (this.isWebcamActive || this.webcamStarting) return;
@@ -533,27 +578,17 @@ class InputManager {
       // 2. 初始化 MediaPipe Hands 體感識別引擎 (開源手勢追蹤技術，來源：Google MediaPipe Hands)
       // 原因用途：藉由追蹤手掌中心控制準星，並利用握拳/抓取 (Fist Grab) 動作實現免硬體光線槍的體感射擊與點擊。
       if (!this.hands) {
-        this.hands = new Hands({
-          locateFile: (file) => {
-            // 如果是透過本地 file:// 協定直接點開網頁，CORS 會阻擋讀取本地模型檔，此時自動切換至 CDN 來源（CDN 支援跨域 * 標頭）
-            if (window.location.protocol === 'file:') {
-              return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-            }
-            // 否則（如 http://localhost 本地伺服器或 GitHub Pages）使用本地離線模型，以支援完全離線遊玩
-            return `js/lib/mediapipe/${file}`;
-          }
+        this.initHands();
+      } else {
+        // 每次啟動時也重新設定 options 確保單雙人模式參數正確
+        const isDouble = typeof gameManager !== 'undefined' && gameManager.selectedMode && gameManager.selectedMode.startsWith('2p');
+        this.hands.setOptions({
+          maxNumHands: isDouble ? 2 : 1,
+          modelComplexity: 0,
+          minDetectionConfidence: 0.55,
+          minTrackingConfidence: 0.55
         });
-
-        this.hands.onResults((results) => this.onHandResults(results));
       }
-
-      const isDouble = typeof gameManager !== 'undefined' && gameManager.selectedMode && gameManager.selectedMode.startsWith('2p');
-      this.hands.setOptions({
-        maxNumHands: isDouble ? 2 : 1,
-        modelComplexity: 0, // 降低模型複雜度以顯著提高執行效能，減少體感模式下的 CPU 消耗與延遲
-        minDetectionConfidence: 0.55,
-        minTrackingConfidence: 0.55
-      });
 
       // 再次檢查在初始化模型期間是否呼叫了 stopWebcam()
       if (!this.webcamStarting) {
@@ -600,6 +635,15 @@ class InputManager {
     this.isWebcamP2Active = false;
     this.isWebcamReady = false; // 重置就緒狀態
 
+    // 重設自動防卡死輔助變數與軌跡鎖定變數
+    this.consecutiveWebcamTimeouts = 0;
+    this.lastVideoTime = -1;
+    this.sameTimeCount = 0;
+    this.p1TrackId = null;
+    this.p2TrackId = null;
+    this.trackedHands = {};
+    this.nextTrackId = 1;
+
     // 關閉影像軌道以關閉鏡頭硬體
     if (this.webcamStream) {
       this.webcamStream.getTracks().forEach(track => track.stop());
@@ -636,20 +680,71 @@ class InputManager {
     
     // readyState >= 3 代表 HAVE_FUTURE_DATA（影片有影格可播放且正常進行）
     if (video && !video.paused && video.readyState >= 3) {
+      // 1. 檢查視訊串流是否卡死 (currentTime 連續 60 幀無變化)
+      const currentTime = video.currentTime;
+      if (this.lastVideoTime === currentTime) {
+        this.sameTimeCount = (this.sameTimeCount || 0) + 1;
+        if (this.sameTimeCount > 60) {
+          console.error("偵測到視訊串流卡死 (currentTime 連續 60 幀未改變)，嘗試重新啟動鏡頭...");
+          this.sameTimeCount = 0;
+          this.restartWebcam();
+          return; // 結束目前的循環，重啟會建立新的循環
+        }
+      } else {
+        this.sameTimeCount = 0;
+        this.lastVideoTime = currentTime;
+      }
+
+      // 2. 進行手勢偵測
       if (this.hands) {
         try {
-          // 等待當前影格偵測完畢，才進行下一影格，防止背景隊列堆積 Lag (與官方 Camera 類別機制一致)
-          await this.hands.send({ image: video });
+          // 使用 Promise.race 防止 hands.send 永久卡死 (WebGL context 遺失或 WASM 內部問題)
+          const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('timeout'), 1000));
+          const sendPromise = this.hands.send({ image: video }).then(() => 'success');
+          
+          const result = await Promise.race([sendPromise, timeoutPromise]);
+          
+          if (result === 'timeout') {
+            console.warn("MediaPipe Hands 偵測超時 (1000ms)");
+            this.consecutiveWebcamTimeouts = (this.consecutiveWebcamTimeouts || 0) + 1;
+            
+            // 如果連續超時超過 3 次，嘗試重置 Hands 引擎
+            if (this.consecutiveWebcamTimeouts >= 3) {
+              console.error("偵測到 MediaPipe 連續超時，嘗試重置體感引擎...");
+              this.initHands();
+              this.consecutiveWebcamTimeouts = 0;
+            }
+          } else {
+            this.consecutiveWebcamTimeouts = 0; // 成功則重置計數
+          }
         } catch (err) {
           console.error("MediaPipe 偵測出錯:", err);
+          this.consecutiveWebcamTimeouts = (this.consecutiveWebcamTimeouts || 0) + 1;
+          if (this.consecutiveWebcamTimeouts >= 3) {
+            console.error("偵測到 MediaPipe 連續出錯，嘗試重置體感引擎...");
+            this.initHands();
+            this.consecutiveWebcamTimeouts = 0;
+          }
         }
       }
+    } else if (video && video.paused && this.isWebcamActive) {
+      // 如果視訊被暫停了，但體感仍是啟用的，重設計數以防誤判
+      this.sameTimeCount = 0;
     }
 
     // 再次確認 active，排程下一影格
     if (this.isWebcamActive) {
       requestAnimationFrame(() => this.tickWebcam());
     }
+  }
+
+  // 重新啟動 Webcam 體感鏡頭 (用於視訊串流卡死時自我修復)
+  async restartWebcam() {
+    console.log("正在重新啟動 Webcam 體感鏡頭...");
+    this.stopWebcam();
+    // 延遲 500ms 確保硬體與串流資源完全釋放
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await this.startWebcam();
   }
 
   // 處理 MediaPipe 傳回的手勢偵測結果
@@ -665,15 +760,62 @@ class InputManager {
     const width = canvas.width;
     const height = canvas.height;
 
-    // 1. 清除畫布並繪製目前的鏡頭影像
+    // 1. 清除畫布
     ctx.clearRect(0, 0, width, height);
+    
+    // 2. 繪製目前的鏡頭影像（在畫布上做水平翻轉以提供鏡像體驗）
     if (results.image) {
+      ctx.save();
+      ctx.translate(width, 0);
+      ctx.scale(-1, 1);
       ctx.drawImage(results.image, 0, 0, width, height);
+      ctx.restore();
     }
 
     const isDoubleMode = typeof gameManager !== 'undefined' && gameManager.selectedMode && gameManager.selectedMode.startsWith('2p');
 
-    // 2. 檢查是否偵測到手部
+    // 如果是雙人模式，繪製中央分隔虛線與「1P 區」/「2P 區」提示 (提升 UX 體驗)
+    if (isDoubleMode) {
+      ctx.save();
+      
+      // 為線條與文字加上陰影，確保在任何亮/暗背景下都一清二楚
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetX = 1;
+      ctx.shadowOffsetY = 1;
+
+      // 1. 繪製中央虛線
+      ctx.strokeStyle = '#facc15'; // 亮黃色，科技感且搶眼
+      ctx.lineWidth = 2.0;
+      ctx.setLineDash([6, 4]); // 更明顯的虛線長度與間距
+      ctx.beginPath();
+      ctx.moveTo(width / 2, 0);
+      ctx.lineTo(width / 2, height);
+      ctx.stroke();
+
+      // 2. 繪製「1P 區」與「2P 區」文字 (移至下方以防被頂部狀態提示遮擋)
+      ctx.fillStyle = '#ffffff'; // 白色字體，配合陰影
+      ctx.font = 'bold 10px Fredoka, Noto Sans TC';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      
+      ctx.fillText('1P 區', width * 0.25, height - 8);
+      ctx.fillText('2P 區', width * 0.75, height - 8);
+      
+      ctx.restore();
+    }
+
+    // 3D 空間距離輔助函數
+    const dist3D = (p1, p2) => {
+      return Math.sqrt(
+        Math.pow(p1.x - p2.x, 2) +
+        Math.pow(p1.y - p2.y, 2) +
+        Math.pow(p1.z - p2.z, 2)
+      );
+    };
+
+    // 解析當前影格偵測到的手部
+    const frameHands = [];
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
       if (statusDiv) {
         statusDiv.textContent = `已連結體感 (${results.multiHandLandmarks.length}人)`;
@@ -694,17 +836,6 @@ class InputManager {
         }
       }
 
-      // 3D 空間距離輔助函數
-      const dist3D = (p1, p2) => {
-        return Math.sqrt(
-          Math.pow(p1.x - p2.x, 2) +
-          Math.pow(p1.y - p2.y, 2) +
-          Math.pow(p1.z - p2.z, 2)
-        );
-      };
-
-      // 解析所有偵測到的手部資料
-      const detectedHands = [];
       for (let i = 0; i < results.multiHandLandmarks.length; i++) {
         const landmarks = results.multiHandLandmarks[i];
         const wrist = landmarks[0];
@@ -714,11 +845,29 @@ class InputManager {
         const palmX = (wrist.x + middleMcp.x) / 2;
         const palmY = (wrist.y + middleMcp.y) / 2;
 
-        // 水平翻轉以提供鏡像體驗，並轉換為遊戲邏輯座標 (1280x720)
-        const rawX = (1 - palmX) * GAME_WIDTH;
-        const rawY = palmY * GAME_HEIGHT;
+        let rawX, rawY;
+        let playerTag = 1;
 
-        // 偵測食指、中指、無名指、小指是否收攏進掌心 (握拳抓取)
+        if (isDoubleMode) {
+          // 雙人模式：Webcam 實體畫面左右切割與雙倍放大映射
+          if (palmX >= 0.5) {
+            // P1 (鏡像前在 Webcam 右側，對應左側玩家)
+            rawX = (1.0 - palmX) * 2.0 * GAME_WIDTH;
+            playerTag = 1;
+          } else {
+            // P2 (鏡像前在 Webcam 左側，對應右側玩家)
+            rawX = (0.5 - palmX) * 2.0 * GAME_WIDTH;
+            playerTag = 2;
+          }
+          rawX = Math.max(0, Math.min(GAME_WIDTH, rawX));
+          rawY = palmY * GAME_HEIGHT;
+        } else {
+          // 單人模式：維持 1:1 全螢幕映射
+          rawX = (1 - palmX) * GAME_WIDTH;
+          rawY = palmY * GAME_HEIGHT;
+          playerTag = 1;
+        }
+
         const dist8 = dist3D(landmarks[8], wrist) / palmLength;
         const dist12 = dist3D(landmarks[12], wrist) / palmLength;
         const dist16 = dist3D(landmarks[16], wrist) / palmLength;
@@ -732,147 +881,168 @@ class InputManager {
 
         const isGrabNow = curledCount >= 3;
 
-        detectedHands.push({
+        frameHands.push({
           rawX,
           rawY,
           isGrabNow,
-          landmarks
+          landmarks,
+          playerTag
         });
       }
+    } else {
+      if (statusDiv) {
+        statusDiv.textContent = isDoubleMode ? '請伸出雙手' : '請伸出手掌';
+      }
+    }
 
-      // 將手部分配給 P1 與 P2
-      let p1Hand = null;
-      let p2Hand = null;
+    // --- 多目標軌跡配對與更新 ---
+    // 1. 每過一影格，將 trackedHands 內的每個軌跡的 lastSeen 增加
+    for (const id in this.trackedHands) {
+      this.trackedHands[id].lastSeen++;
+    }
 
-      if (detectedHands.length === 2) {
-        if (isDoubleMode) {
-          // 偵測到兩隻手，先以 X 座標區分左右
-          let leftHand = detectedHands[0].rawX < detectedHands[1].rawX ? detectedHands[0] : detectedHands[1];
-          let rightHand = detectedHands[0].rawX < detectedHands[1].rawX ? detectedHands[1] : detectedHands[0];
-          
-          // 若雙方前一幀都活躍，使用歐式距離來匹配，避免因為手部短暫交叉或雜訊導致 P1/P2 瞬間互換
-          if (this.isWebcamP1Active && this.isWebcamP2Active) {
-            const costNormal = Math.hypot(leftHand.rawX - this.p1WebcamX, leftHand.rawY - this.p1WebcamY) +
-                               Math.hypot(rightHand.rawX - this.p2WebcamX, rightHand.rawY - this.p2WebcamY);
-            const costSwapped = Math.hypot(rightHand.rawX - this.p1WebcamX, rightHand.rawY - this.p1WebcamY) +
-                                Math.hypot(leftHand.rawX - this.p2WebcamX, leftHand.rawY - this.p2WebcamY);
-            
-            if (costSwapped < costNormal) {
-              p1Hand = rightHand;
-              p2Hand = leftHand;
-            } else {
-              p1Hand = leftHand;
-              p2Hand = rightHand;
-            }
-          } else {
-            p1Hand = leftHand;
-            p2Hand = rightHand;
-          }
-        } else {
-          // 單人模式，只取第一隻手
-          p1Hand = detectedHands[0];
-        }
-      } else if (detectedHands.length === 1) {
-        const hand = detectedHands[0];
-        if (isDoubleMode) {
-          // 混合 Tracking 演算法：優先考量上一幀的距離，若無上一幀或距離過遠，再以中線劃分
-          const distP1 = Math.hypot(hand.rawX - this.p1WebcamX, hand.rawY - this.p1WebcamY);
-          const distP2 = Math.hypot(hand.rawX - this.p2WebcamX, hand.rawY - this.p2WebcamY);
-          
-          const P1_ACTIVE = this.isWebcamP1Active;
-          const P2_ACTIVE = this.isWebcamP2Active;
+    // 2. 將 frameHands 配對給 trackedHands
+    const matchedFrameIndices = new Set();
 
-          if (P1_ACTIVE && P2_ACTIVE) {
-            if (distP1 < distP2) p1Hand = hand;
-            else p2Hand = hand;
-          } else if (P1_ACTIVE && !P2_ACTIVE) {
-            // 如果只有 P1 活躍，但這隻手突然出現在畫面極右側且距離 P1 很遠，這可能是 P2 剛把手舉起來
-            if (hand.rawX > GAME_WIDTH * 0.6 && distP1 > GAME_WIDTH * 0.3) {
-              p2Hand = hand;
-            } else {
-              p1Hand = hand;
-            }
-          } else if (!P1_ACTIVE && P2_ACTIVE) {
-            // 如果只有 P2 活躍，但這隻手突然出現在畫面極左側且距離 P2 很遠，這可能是 P1 剛把手舉起來
-            if (hand.rawX < GAME_WIDTH * 0.4 && distP2 > GAME_WIDTH * 0.3) {
-              p1Hand = hand;
-            } else {
-              p2Hand = hand;
-            }
-          } else {
-            // 兩者皆不活躍，直接用中線劃分
-            if (hand.rawX < GAME_WIDTH * 0.5) p1Hand = hand;
-            else p2Hand = hand;
-          }
-        } else {
-          // 單人模式，一律歸為 P1
-          p1Hand = hand;
+    for (const id in this.trackedHands) {
+      const track = this.trackedHands[id];
+      let bestIndex = -1;
+      let minDist = Infinity;
+      
+      for (let j = 0; j < frameHands.length; j++) {
+        if (matchedFrameIndices.has(j)) continue;
+        if (isDoubleMode && track.playerTag !== frameHands[j].playerTag) continue;
+
+        const dist = Math.hypot(frameHands[j].rawX - track.rawX, frameHands[j].rawY - track.rawY);
+        if (dist < minDist) {
+          minDist = dist;
+          bestIndex = j;
         }
       }
 
-      // 3. 更新 P1 狀態
-      if (p1Hand) {
-        this.isWebcamP1Active = true;
-        this.p1WebcamTargetX = Math.max(0, Math.min(GAME_WIDTH, p1Hand.rawX));
-        this.p1WebcamTargetY = Math.max(0, Math.min(GAME_HEIGHT, p1Hand.rawY));
+      if (bestIndex !== -1 && minDist < 180) {
+        const matchedHand = frameHands[bestIndex];
+        track.rawX = matchedHand.rawX;
+        track.rawY = matchedHand.rawY;
+        track.isGrabNow = matchedHand.isGrabNow;
+        track.landmarks = matchedHand.landmarks;
+        track.lastSeen = 0;
+        matchedFrameIndices.add(bestIndex);
+      }
+    }
 
-        if (p1Hand.isGrabNow) {
-          if (!this.isPinchingP1) {
-            this.isPinchingP1 = true;
-            this.triggerWebcamShoot(1, this.p1WebcamX, this.p1WebcamY);
-          }
-        } else {
-          this.isPinchingP1 = false;
-        }
-        this.isPinching = this.isPinchingP1;
+    // 3. 對於未配對成功的當前手部，建立全新軌跡
+    for (let j = 0; j < frameHands.length; j++) {
+      if (matchedFrameIndices.has(j)) continue;
+      
+      const newHand = frameHands[j];
+      const newId = this.nextTrackId++;
+      
+      this.trackedHands[newId] = {
+        rawX: newHand.rawX,
+        rawY: newHand.rawY,
+        isGrabNow: newHand.isGrabNow,
+        landmarks: newHand.landmarks,
+        playerTag: newHand.playerTag,
+        lastSeen: 0
+      };
+    }
+
+    // 4. 清理過期（超過 10 幀未更新）的軌跡
+    for (const id in this.trackedHands) {
+      if (this.trackedHands[id].lastSeen > 10) {
+        console.log(`軌跡 TrackID ${id} 消失，進行銷毀。`);
+        delete this.trackedHands[id];
+      }
+    }
+
+    // --- P1 & P2 準心鎖定與解鎖 ---
+    let p1Hand = null;
+    let p2Hand = null;
+
+    if (this.p1TrackId !== null && this.trackedHands[this.p1TrackId]) {
+      p1Hand = this.trackedHands[this.p1TrackId];
+    } else {
+      this.p1TrackId = null;
+      let candidates = Object.keys(this.trackedHands).map(Number);
+      if (isDoubleMode) {
+        candidates = candidates.filter(id => this.trackedHands[id].playerTag === 1);
+      }
+      if (candidates.length > 0) {
+        this.p1TrackId = candidates[0];
+        p1Hand = this.trackedHands[this.p1TrackId];
+        console.log(`P1 鎖定新軌跡 TrackID ${this.p1TrackId}`);
+      }
+    }
+
+    if (isDoubleMode) {
+      if (this.p2TrackId !== null && this.trackedHands[this.p2TrackId]) {
+        p2Hand = this.trackedHands[this.p2TrackId];
       } else {
-        this.isWebcamP1Active = false;
+        this.p2TrackId = null;
+        let candidates = Object.keys(this.trackedHands).map(Number);
+        candidates = candidates.filter(id => this.trackedHands[id].playerTag === 2);
+        if (candidates.length > 0) {
+          this.p2TrackId = candidates[0];
+          p2Hand = this.trackedHands[this.p2TrackId];
+          console.log(`P2 鎖定新軌跡 TrackID ${this.p2TrackId}`);
+        }
+      }
+    }
+
+    // 3. 更新 P1 狀態
+    if (p1Hand) {
+      this.isWebcamP1Active = true;
+      this.p1WebcamTargetX = p1Hand.rawX;
+      this.p1WebcamTargetY = p1Hand.rawY;
+
+      if (p1Hand.isGrabNow) {
+        if (!this.isPinchingP1) {
+          this.isPinchingP1 = true;
+          this.triggerWebcamShoot(1, this.p1WebcamX, this.p1WebcamY);
+        }
+      } else {
         this.isPinchingP1 = false;
       }
+      this.isPinching = this.isPinchingP1;
+    } else {
+      this.isWebcamP1Active = false;
+      this.isPinchingP1 = false;
+    }
 
-      // 4. 更新 P2 狀態
-      if (p2Hand && isDoubleMode) {
-        this.isWebcamP2Active = true;
-        this.p2WebcamTargetX = Math.max(0, Math.min(GAME_WIDTH, p2Hand.rawX));
-        this.p2WebcamTargetY = Math.max(0, Math.min(GAME_HEIGHT, p2Hand.rawY));
+    // 4. 更新 P2 狀態
+    if (p2Hand && isDoubleMode) {
+      this.isWebcamP2Active = true;
+      this.p2WebcamTargetX = p2Hand.rawX;
+      this.p2WebcamTargetY = p2Hand.rawY;
 
-        if (p2Hand.isGrabNow) {
-          if (!this.isPinchingP2) {
-            this.isPinchingP2 = true;
-            this.triggerWebcamShoot(2, this.p2WebcamX, this.p2WebcamY);
-          }
-        } else {
-          this.isPinchingP2 = false;
+      if (p2Hand.isGrabNow) {
+        if (!this.isPinchingP2) {
+          this.isPinchingP2 = true;
+          this.triggerWebcamShoot(2, this.p2WebcamX, this.p2WebcamY);
         }
       } else {
-        this.isWebcamP2Active = false;
         this.isPinchingP2 = false;
       }
-
-      // 更新 Webcam 容器的射擊發光效果
-      const isAnyPinching = this.isPinchingP1 || this.isPinchingP2;
-      if (isAnyPinching) {
-        if (container) container.classList.add('shooting');
-      } else {
-        if (container) container.classList.remove('shooting');
-      }
-
-      // 5. 繪製骨架與瞄準器
-      if (p1Hand) {
-        this.drawSkeleton(ctx, p1Hand.landmarks, width, height, this.isPinchingP1, 1);
-      }
-      if (p2Hand && isDoubleMode) {
-        this.drawSkeleton(ctx, p2Hand.landmarks, width, height, this.isPinchingP2, 2);
-      }
-
     } else {
-      if (statusDiv) statusDiv.textContent = isDoubleMode ? '請伸出雙手' : '請伸出手掌';
-      if (container) container.classList.remove('shooting');
-      this.isPinching = false;
-      this.isPinchingP1 = false;
-      this.isPinchingP2 = false;
-      this.isWebcamP1Active = false;
       this.isWebcamP2Active = false;
+      this.isPinchingP2 = false;
+    }
+
+    // 更新 Webcam 容器的射擊發光效果
+    const isAnyPinching = this.isPinchingP1 || this.isPinchingP2;
+    if (isAnyPinching) {
+      if (container) container.classList.add('shooting');
+    } else {
+      if (container) container.classList.remove('shooting');
+    }
+
+    // 5. 繪製骨架與瞄準器
+    if (p1Hand && p1Hand.landmarks) {
+      this.drawSkeleton(ctx, p1Hand.landmarks, width, height, this.isPinchingP1, 1);
+    }
+    if (p2Hand && p2Hand.landmarks && isDoubleMode) {
+      this.drawSkeleton(ctx, p2Hand.landmarks, width, height, this.isPinchingP2, 2);
     }
   }
 
@@ -911,28 +1081,28 @@ class InputManager {
       [0, 17]                               // 手掌底
     ];
 
-    // 繪製關節線
+    // 繪製關節線 (X 座標加上 (1 - x) 鏡像翻轉，以與鏡像背景對齊)
     connections.forEach(([i, j]) => {
       const p1 = landmarks[i];
       const p2 = landmarks[j];
       ctx.beginPath();
-      ctx.moveTo(p1.x * width, p1.y * height);
-      ctx.lineTo(p2.x * width, p2.y * height);
+      ctx.moveTo((1 - p1.x) * width, p1.y * height);
+      ctx.lineTo((1 - p2.x) * width, p2.y * height);
       ctx.stroke();
     });
 
-    // 繪製關節點
+    // 繪製關節點 (X 座標加上 (1 - x) 鏡像翻轉)
     for (let i = 0; i < landmarks.length; i++) {
       const p = landmarks[i];
       ctx.beginPath();
-      ctx.arc(p.x * width, p.y * height, 3, 0, 2 * Math.PI);
+      ctx.arc((1 - p.x) * width, p.y * height, 3, 0, 2 * Math.PI);
       ctx.fill();
     }
 
-    // 繪製手掌中心 (準星定位點) 的十字瞄準標記 (提供更具回饋的科技感 UI)
+    // 繪製手掌中心 (準星定位點) 的十字瞄準標記 (水平 X 座標加上 (1 - x) 鏡像翻轉)
     const wrist = landmarks[0];
     const middleMcp = landmarks[9];
-    const palmX = ((wrist.x + middleMcp.x) / 2) * width;
+    const palmX = (1 - (wrist.x + middleMcp.x) / 2) * width;
     const palmY = ((wrist.y + middleMcp.y) / 2) * height;
 
     ctx.save();
@@ -950,7 +1120,7 @@ class InputManager {
     ctx.lineTo(palmX, palmY + 12);
     ctx.stroke();
 
-    // 繪製 "1P" 或 "2P" 標籤
+    // 繪製 "1P" 或 "2P" 標籤 (此文字現在是正向的)
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 10px Fredoka';
     ctx.textAlign = 'center';

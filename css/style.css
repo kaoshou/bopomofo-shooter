@@ -1004,7 +1004,6 @@ body {
 #webcam-preview-canvas {
   width: 100%;
   height: 100%;
-  transform: scaleX(-1); /* 水平翻轉以提供鏡像體驗 */
   object-fit: cover;
   background-color: #111;
 }
