@@ -432,6 +432,28 @@ class AudioManager {
     osc.start();
     osc.stop(this.ctx.currentTime + 0.16);
   }
+
+  // 播放倒數最後 10 秒的滴答提醒音效
+  playCountdownTick(isCritical = false) {
+    this.initAudioContext();
+    if (!this.ctx) return;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.type = 'sine';
+    const freq = isCritical ? 1046.5 : 783.99; // C6 (最後3秒) 或 G5 (10~4秒)
+    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+
+    const vol = typeof gameSettings !== 'undefined' ? gameSettings.sfxVolume : 0.8;
+    gain.gain.setValueAtTime(0.12 * vol, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.09);
+  }
 }
 
 // 建立全域音效管理器實例

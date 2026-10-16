@@ -530,43 +530,65 @@ body {
   box-shadow: 0 0px 0 #1d4ed8, 0 2px 4px rgba(0,0,0,0.3);
 }
 
-/* 減少按鈕採用灰色，增加按鈕用藍色做區分 */
-#btn-setting-repeat-dec, #btn-setting-voice-dec, #btn-setting-sfx-dec {
-  background-color: #6b7280; /* 灰色 */
+/* 減少按鈕統一採用岩石灰，增加按鈕採用活力藍做區分 */
+[id$="-dec"].btn-adjust {
+  background-color: #6b7280;
   box-shadow: 0 4px 0 #4b5563, 0 6px 10px rgba(0,0,0,0.3);
 }
-#btn-setting-repeat-dec:active, #btn-setting-voice-dec:active, #btn-setting-sfx-dec:active {
+[id$="-dec"].btn-adjust:active {
   box-shadow: 0 0px 0 #4b5563, 0 2px 4px rgba(0,0,0,0.3);
 }
 
-#btn-setting-repeat-inc, #btn-setting-voice-inc, #btn-setting-sfx-inc {
-  background-color: var(--color-p1); /* 藍色 */
+[id$="-inc"].btn-adjust {
+  background-color: var(--color-p1);
+}
+
+.btn-adjust:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none !important;
+  top: 0 !important;
+  filter: grayscale(0.4);
 }
 
 .settings-value {
   font-size: 1.35rem;
   font-weight: bold;
   color: var(--color-accent-yellow);
-  min-width: 90px;
+  min-width: 105px;
   text-align: center;
   text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.4);
   padding: 6px 16px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(254, 240, 138, 0.2);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.4);
 }
 
 /* 暫停選單與結算選單 */
 .modal-box {
-  background: linear-gradient(135deg, rgba(30, 50, 32, 0.98) 0%, rgba(10, 20, 10, 0.98) 100%);
+  background: linear-gradient(135deg, rgba(30, 52, 33, 0.98) 0%, rgba(12, 24, 13, 0.98) 100%);
   border: 8px solid var(--color-board-border);
   border-radius: 24px;
-  padding: 40px;
+  padding: 36px 40px;
   text-align: center;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
-  max-width: 600px;
+  box-shadow: 0 8px 0 #5c3a1a, 0 24px 48px rgba(0, 0, 0, 0.7), inset 0 0 30px rgba(255, 255, 255, 0.03);
+  max-width: 640px;
   width: 90%;
   z-index: 100;
+  animation: modalPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes modalPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translateY(15px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .modal-title {
@@ -829,15 +851,76 @@ body {
 
 .hud-lives {
   display: flex;
+  align-items: center;
   gap: 0.4cqw;
   font-size: 2cqw;
   color: #ef4444;
+}
+
+/* Boss 魔王關卡專屬動態血量槽 */
+.boss-hp-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6cqw;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 0.25cqw 0.9cqw;
+  border-radius: 1.2cqw;
+  border: 0.12cqw solid rgba(239, 68, 68, 0.6);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+}
+
+.boss-hp-label {
+  font-size: 1.15cqw;
+  font-weight: 900;
+  color: #fca5a5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3cqw;
+  white-space: nowrap;
+}
+
+.boss-hp-bar-track {
+  width: 11cqw;
+  height: 1.1cqw;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 0.6cqw;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  position: relative;
+}
+
+.boss-hp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #dc2626 0%, #f97316 50%, #facc15 100%);
+  border-radius: 0.6cqw;
+  transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+}
+
+.boss-hp-text {
+  font-size: 1.15cqw;
+  font-weight: 900;
+  color: #fef08a;
+  min-width: 3.2cqw;
+  text-align: right;
 }
 
 .hud-timer {
   font-size: 2.2cqw;
   font-weight: 700;
   color: var(--color-accent-yellow);
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.hud-timer.urgent {
+  color: #f87171;
+  text-shadow: 0 0 12px rgba(239, 68, 68, 0.9);
+  animation: timerUrgentPulse 0.6s infinite alternate ease-in-out;
+}
+
+@keyframes timerUrgentPulse {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.14); }
 }
 
 /* 遊戲中鼓勵與提示文字 overlay */
@@ -953,6 +1036,31 @@ body {
   transform: translate(-50%, -50%);
 }
 
+/* 選單射擊點擊波紋回饋 */
+.menu-shoot-ripple {
+  position: fixed;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid var(--color-accent-yellow);
+  background: rgba(254, 240, 138, 0.35);
+  transform: translate(-50%, -50%) scale(0.4);
+  pointer-events: none;
+  z-index: 9998;
+  animation: shootRippleAnim 0.4s ease-out forwards;
+}
+
+@keyframes shootRippleAnim {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.0);
+  }
+}
+
 /* 全域隱藏類別 (解決場景重疊殘留與跑版之根本問題) */
 .hidden {
   display: none !important;
@@ -1059,6 +1167,13 @@ body {
   transform: translateY(-1px);
 }
 
+.mistake-card.playing {
+  background: rgba(254, 240, 138, 0.28);
+  border-color: var(--color-accent-yellow);
+  box-shadow: 0 0 18px rgba(254, 240, 138, 0.7);
+  transform: scale(1.06);
+}
+
 .mistake-char {
   font-size: 1.8rem;
   font-weight: 900;
@@ -1079,15 +1194,57 @@ body {
   border-top: 1.5px dashed rgba(255, 255, 255, 0.15);
 }
 
+.bopomofo-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.15);
+  padding-bottom: 10px;
+}
+
 .bopomofo-table-title {
   font-size: 1.25rem;
   font-weight: bold;
   color: var(--color-accent-yellow);
-  margin-bottom: 15px;
   text-align: left;
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.zhuyin-legend {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.legend-item {
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1.5px dashed;
+}
+
+.legend-item.consonant {
+  color: #93c5fd;
+  border-color: rgba(147, 197, 253, 0.5);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.legend-item.medial {
+  color: #fef08a;
+  border-color: rgba(254, 240, 138, 0.5);
+  background: rgba(234, 179, 8, 0.12);
+}
+
+.legend-item.vowel {
+  color: #fbcfe8;
+  border-color: rgba(251, 207, 232, 0.5);
+  background: rgba(236, 72, 153, 0.12);
 }
 
 .zhuyin-grid {
@@ -1110,18 +1267,46 @@ body {
   font-family: var(--font-primary);
   text-shadow: 0 2px 3px rgba(0,0,0,0.3);
   box-shadow: inset 0 0 10px rgba(255,255,255,0.02);
+  position: relative;
+}
+
+.zhuyin-btn[data-group="consonant"] {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(147, 197, 253, 0.4);
+  color: #e0f2fe;
+}
+
+.zhuyin-btn[data-group="medial"] {
+  background: rgba(234, 179, 8, 0.1);
+  border-color: rgba(254, 240, 138, 0.45);
+  color: #fef9c3;
+}
+
+.zhuyin-btn[data-group="vowel"] {
+  background: rgba(236, 72, 153, 0.08);
+  border-color: rgba(251, 207, 232, 0.4);
+  color: #fce7f3;
 }
 
 .zhuyin-btn:hover {
   transform: scale(1.08);
-  background: rgba(254, 240, 138, 0.1);
+  background: rgba(254, 240, 138, 0.18);
   border-color: var(--color-accent-yellow);
   color: var(--color-accent-yellow);
-  box-shadow: 0 0 15px rgba(234, 179, 8, 0.3);
+  box-shadow: 0 0 15px rgba(234, 179, 8, 0.35);
 }
 
 .zhuyin-btn:active {
   transform: scale(0.96);
+}
+
+.zhuyin-btn.playing {
+  transform: scale(1.1);
+  background: rgba(74, 222, 128, 0.25);
+  border-color: #4ade80;
+  border-style: solid;
+  color: #4ade80;
+  box-shadow: 0 0 20px rgba(74, 222, 128, 0.6);
 }
 
 

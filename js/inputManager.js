@@ -237,15 +237,24 @@ class InputManager {
   applyGunCountUI(count) {
     const statusDiv = document.getElementById('home-gun-status');
     const calibBtn = document.getElementById('btn-go-calibration');
+    const gunSvg = `<svg class="icon-svg" viewBox="0 0 24 24" style="margin-right: 6px; vertical-align: middle;">
+      <circle cx="12" cy="12" r="10"></circle>
+      <circle cx="12" cy="12" r="6"></circle>
+      <circle cx="12" cy="12" r="2"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+    </svg>`;
     
     if (statusDiv) {
       if (count === 0) {
-        statusDiv.innerHTML = `🔌 偵測到光線槍：0 支 (請射擊或扣動扳機啟用)`;
+        statusDiv.innerHTML = `${gunSvg}偵測到光線槍：0 支 (請扣動扳機啟用)`;
         statusDiv.style.borderColor = 'rgba(239, 68, 68, 0.4)';
         statusDiv.style.color = '#f87171'; // 紅色
       } else {
-        statusDiv.innerHTML = `🔌 偵測到光線槍：${count} 支 (已就緒)`;
-        statusDiv.style.borderColor = 'rgba(74, 222, 128, 0.5)';
+        statusDiv.innerHTML = `${gunSvg}偵測到光線槍：${count} 支 (已連線就緒)`;
+        statusDiv.style.borderColor = 'rgba(74, 222, 128, 0.55)';
         statusDiv.style.color = '#4ade80'; // 綠色
       }
     }
@@ -445,9 +454,19 @@ class InputManager {
     if (typeof audioManager !== 'undefined') {
       audioManager.playShoot();
     }
+
+    // 產生選單射擊點擊視覺波紋
+    if (typeof document !== 'undefined' && clientX !== undefined && clientY !== undefined) {
+      const ripple = document.createElement('div');
+      ripple.className = 'menu-shoot-ripple';
+      ripple.style.left = `${clientX}px`;
+      ripple.style.top = `${clientY}px`;
+      document.body.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 420);
+    }
     
-    // 獲取畫面上所有可能的點擊目標
-    const clickables = document.querySelectorAll('button, .difficulty-card, .btn');
+    // 獲取畫面上所有可能的點擊目標 (含錯題溫習字卡與注音發音表按鈕)
+    const clickables = document.querySelectorAll('button, .difficulty-card, .btn, .mistake-card');
     
     for (let el of clickables) {
       // 安全且精確的隱藏元素判定 (包含祖先類別是否 hidden)
@@ -458,7 +477,7 @@ class InputManager {
       
       // 光槍輔助瞄準容差：對於寬或高較小的按鈕，給予外擴 15px 的射擊容差，以利精準命中
       let tolerance = 0;
-      const isSmallBtn = rect.width < 80 || rect.height < 80 || el.classList.contains('btn-adjust');
+      const isSmallBtn = rect.width < 80 || rect.height < 80 || el.classList.contains('btn-adjust') || el.classList.contains('mistake-card');
       if (isSmallBtn) {
         tolerance = 15;
       }

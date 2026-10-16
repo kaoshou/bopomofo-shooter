@@ -35,6 +35,7 @@ class GameManager {
     this.p1FlashAlpha = 0;
     this.p2FlashAlpha = 0;
     this.vsTexts = [];
+    this.bgCanvas = null; // 離屏黑板背景快取
     
     // 時間增量更新 (Delta Time) 變數
     this.lastFrameTime = 0;
@@ -44,6 +45,9 @@ class GameManager {
     this.canvas = document.getElementById('game-canvas');
     this.ctx = this.canvas.getContext('2d');
     
+    // 預先渲染靜態黑板背景快取，大幅提升每幀繪圖效能並強化視覺細節
+    this.initBlackboardCache();
+
     // 初始化輸入管理器
     inputManager.init(this.canvas);
     
@@ -179,6 +183,10 @@ class GameManager {
         this.timeRemaining--;
         this.updateHUD();
         
+        if (this.timeRemaining <= 10 && this.timeRemaining > 0) {
+          audioManager.playCountdownTick(this.timeRemaining <= 3);
+        }
+
         if (this.timeRemaining <= 0) {
           this.endGame(true); // 時間到
         }
@@ -195,8 +203,6 @@ class GameManager {
     if (this.state !== 'PLAYING') return;
 
     const config = DIFFICULTY_CONFIG[this.selectedDiff];
-    
-
     
     // 1. 決定正確答案 (從難度允許的名單中隨機挑選)
     const allowed = config.allowedSymbols;
@@ -281,52 +287,79 @@ class GameManager {
     shooter.triggerShoot();
     audioManager.playShoot();
 
-    let hitAnything = false;
+    const isCoop = this.selectedMode && this.selectedMode.includes('coop');
+    const isVs = this.selectedMode && this.selectedMode.includes('vs');
 
     // 從後往前檢查氣球，確保先擊中最上層的
     for (let i = this.balloons.length - 1; i >= 0; i--) {
       const b = this.balloons[i];
       if (b.active && b.checkCollision(x, y)) {
-        hitAnything = true;
-        b.isPopping = true; // 觸發氣球收縮爆裂動效
+        b.isPopping = true; // 觸發氣球爆裂動效
         this.flashDuration = 2; // 畫面閃光 2 幀
         
-        // 產生爆裂粒子特效
-        particleSystem.spawnExplosion(b.x, b.y, b.color, 25);
+        // 產生爆裂粒子與震波特效 (區分正確/錯誤視覺)
+        particleSystem.spawnExplosion(b.x, b.y, b.color, b.isCorrect ? 26 : 16, b.isCorrect);
 
         if (b.isCorrect) {
           // 擊中正確注音！
           shooter.shotsHit++;
-          shooter.addCombo();
+          if (isCoop) {
+            // 雙人合作模式：雙方共享 Combo 連擊與分數
+            this.p1.addCombo();
+            this.p2.addCombo();
+          } else {
+            shooter.addCombo();
+          }
           
-          // 加分規則
-          // 2P 合作模式：共同加分，且 Combo 數對雙方都有加成
-          // 2P 對抗模式：擊中 correct 即加分並直接切換題目，防範對方搶答
           const points = 100 + shooter.combo * 10;
           
-          if (this.selectedMode === '2p-coop') {
+          if (isCoop) {
             this.p1.score += points;
             this.p2.score += points;
           } else {
             shooter.score += points;
           }
 
-          // 2P 對抗模式搶答視覺提示
-          const isVs = this.selectedMode && this.selectedMode.includes('vs');
+          // 擊中得分與連擊動態飄字回饋
           if (isVs) {
             if (playerNum === 1) {
-              this.p1FlashAlpha = 0.45; // 閃爍 P1 半邊
+              this.p1FlashAlpha = 0.45;
             } else {
-              this.p2FlashAlpha = 0.45; // 閃爍 P2 半邊
+              this.p2FlashAlpha = 0.45;
             }
             this.vsTexts.push({
-              text: `P${playerNum} 搶答成功! +${points}`,
+              text: `P${playerNum} 搶答! +${points}`,
               x: b.x,
               y: b.y - 20,
               alpha: 1.0,
               color: playerNum === 1 ? '#60a5fa' : '#f87171',
-              life: 50 // 幀數
+              fontSize: 26,
+              life: 52,
+              maxLife: 52
             });
+          } else {
+            this.vsTexts.push({
+              text: `+${points}`,
+              x: b.x,
+              y: b.y - 15,
+              alpha: 1.0,
+              color: '#4ade80',
+              fontSize: 28,
+              life: 45,
+              maxLife: 45
+            });
+            if (shooter.combo >= 2) {
+              this.vsTexts.push({
+                text: `${shooter.combo} COMBO!`,
+                x: b.x,
+                y: b.y - 48,
+                alpha: 1.0,
+                color: '#fef08a',
+                fontSize: 22,
+                life: 48,
+                maxLife: 48
+              });
+            }
           }
 
           // 連擊音效或一般正確音效
@@ -343,6 +376,7 @@ class GameManager {
           if (this.selectedDiff === 'boss') {
             this.bossHp--;
             if (this.bossHp <= 0) {
+              this.updateHUD();
               this.endGame(true); // 擊敗 Boss 獲勝
               return;
             }
@@ -357,16 +391,33 @@ class GameManager {
         } else {
           // 擊中錯誤注音！
           shooter.shotsWrong++;
-          shooter.resetCombo();
+          if (isCoop) {
+            this.p1.resetCombo();
+            this.p2.resetCombo();
+          } else {
+            shooter.resetCombo();
+          }
           
           // 扣分 (最低 0 分)
           const penalty = 50;
-          if (this.selectedMode === '2p-coop') {
+          if (isCoop) {
             this.p1.score = Math.max(0, this.p1.score - penalty);
             this.p2.score = Math.max(0, this.p2.score - penalty);
           } else {
             shooter.score = Math.max(0, shooter.score - penalty);
           }
+
+          // 錯誤扣分飄字
+          this.vsTexts.push({
+            text: `-${penalty}`,
+            x: b.x,
+            y: b.y - 15,
+            alpha: 1.0,
+            color: '#f87171',
+            fontSize: 26,
+            life: 40,
+            maxLife: 40
+          });
 
           // 紀錄錯題
           this.mistakes.push({
@@ -379,7 +430,6 @@ class GameManager {
           this.showFeedback('再聽一次！', 'wrong');
           
           // 扣生命值 (對抗模式不扣隊伍生命，只扣分數)
-          const isVs = this.selectedMode && this.selectedMode.includes('vs');
           if (!isVs) {
             this.deductLife();
           }
@@ -440,18 +490,46 @@ class GameManager {
       }
     }
 
-    // 剩餘時間
-    document.getElementById('game-timer').textContent = Math.max(0, this.timeRemaining);
+    // 剩餘時間與最後 10 秒緊急閃爍狀態
+    const timerValEl = document.getElementById('game-timer');
+    if (timerValEl) {
+      timerValEl.textContent = Math.max(0, this.timeRemaining);
+      const timerContainer = timerValEl.closest('.hud-timer');
+      if (timerContainer) {
+        if (this.timeRemaining <= 10 && this.timeRemaining > 0 && this.state === 'PLAYING') {
+          timerContainer.classList.add('urgent');
+        } else {
+          timerContainer.classList.remove('urgent');
+        }
+      }
+    }
 
-    // 生命值 (心形繪製)
+    // 生命值與 Boss 血量條繪製
     const livesContainer = document.getElementById('hud-lives-container');
     livesContainer.innerHTML = '';
     
     if (this.selectedDiff === 'boss') {
-      // Boss 關卡：顯示 Boss 血量條與玩家血量，移除 😈
-      livesContainer.innerHTML = `<span style="color:#ef4444; display: inline-flex; align-items: center; gap: 6px; font-weight: bold;"><svg class="icon-svg icon-svg-fill" viewBox="0 0 24 24" style="width: 1.5em; height: 1.5em;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 16h-2v-2h2v2zm0-4h-2V7h2v7z"></path><path d="M5.3 4.9c.4.4.4 1 0 1.4l-1.4 1.4c-.4.4-1 .4-1.4 0s-.4-1 0-1.4l1.4-1.4c.4-.4 1-.4 1.4 0zm14.8 0c.4-.4 1-.4 1.4 0s.4 1 0 1.4l-1.4 1.4c-.4.4-1 .4-1.4 0s-.4-1 0-1.4l1.4-1.4z"></path></svg> Boss HP: ${this.bossHp}/${this.bossMaxHp}</span>`;
-    } else {
-      // 一般關卡：顯示愛心 SVG
+      // Boss 關卡：顯示動態漸層血量槽 + 玩家愛心生命值
+      const hpPercent = Math.max(0, Math.min(100, (this.bossHp / this.bossMaxHp) * 100));
+      const bossWrapper = document.createElement('div');
+      bossWrapper.className = 'boss-hp-wrapper';
+      bossWrapper.innerHTML = `
+        <span class="boss-hp-label">
+          <svg class="icon-svg icon-svg-fill" viewBox="0 0 24 24" style="color: #ef4444; width: 1.25em; height: 1.25em;">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 16h-2v-2h2v2zm0-4h-2V7h2v7z"></path>
+          </svg>BOSS
+        </span>
+        <div class="boss-hp-bar-track">
+          <div class="boss-hp-bar-fill" style="width: ${hpPercent}%;"></div>
+        </div>
+        <span class="boss-hp-text">${this.bossHp}/${this.bossMaxHp}</span>
+      `;
+      livesContainer.appendChild(bossWrapper);
+    }
+
+    // 繪製玩家愛心 SVG (對抗模式不扣命故不需愛心，其餘含 Boss 模式皆顯示玩家生命)
+    const isVs = this.selectedMode && this.selectedMode.includes('vs');
+    if (!isVs) {
       for (let i = 0; i < this.maxLives; i++) {
         const heart = document.createElement('span');
         if (i < this.lives) {
@@ -561,30 +639,32 @@ class GameManager {
           }
         }
       } else {
-        // 合作模式：展示團隊綜合評估
+        // 合作模式：展示團隊綜合評估 (合作模式下 p1 與 p2 為共享團隊總分)
         if (evalEl) {
           evalEl.classList.remove('hidden');
-          const totalScore = this.p1.score + this.p2.score;
-          const avgAcc = Math.round((this.p1.getAccuracy() + this.p2.getAccuracy()) / 2);
+          const teamScore = this.p1.score;
+          const totalHits = this.p1.shotsHit + this.p2.shotsHit;
+          const totalShots = this.p1.shotsFired + this.p2.shotsFired;
+          const teamAcc = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : 0;
           
-          let rank = '💥 互相傷害 (C 級)';
+          let rank = '互相傷害 (C 級)';
           let desc = '確定沒有把子彈射在隊友準星上嗎？再多練習，培養一下默契吧！';
           
-          if (totalScore >= 3000 && avgAcc >= 85) {
-            rank = '👑 神射俠侶 (S 級)';
+          if (teamScore >= 2500 && teamAcc >= 80) {
+            rank = '神射拍檔 (S 級)';
             desc = '合作無間，百發百中！你們的默契已經無人能敵，堪稱黃金拍檔！';
-          } else if (totalScore >= 1800) {
-            rank = '🎮 合作無間 (A 級)';
+          } else if (teamScore >= 1500) {
+            rank = '合作無間 (A 級)';
             desc = '配合得相當有默契！大部分氣球都被你們聯手擊破了，非常優秀！';
-          } else if (totalScore >= 1000) {
-            rank = '🎈 漸入佳境 (B 級)';
+          } else if (teamScore >= 800) {
+            rank = '漸入佳境 (B 級)';
             desc = '氣球漏得不多，分工還可以再更細密一些，下次一定能拿 S 級！';
           }
           
           evalEl.innerHTML = `
             <div style="font-size: 1.3rem; font-weight: 900; color: var(--color-accent-yellow); margin-bottom: 8px;">團隊綜合評價：${rank}</div>
-            <div style="font-size: 1rem; color: rgba(255,255,255,0.8); line-height: 1.5;">P1+P2 總分：<span style="color:#fff;font-weight:bold;">${totalScore}</span> | 團隊平均命中率：<span style="color:#fff;font-weight:bold;">${avgAcc}%</span></div>
-            <div style="font-size: 0.95rem; color: var(--color-accent-pink); margin-top: 5px; font-style: italic;">"${desc}"</div>
+            <div style="font-size: 1rem; color: rgba(255,255,255,0.85); line-height: 1.6;">團隊共同總分：<span style="color:#fef08a;font-weight:bold;">${teamScore}</span> ｜ 聯手擊破：<span style="color:#4ade80;font-weight:bold;">${totalHits} 題</span> (1P: ${this.p1.shotsHit} / 2P: ${this.p2.shotsHit}) ｜ 團隊命中率：<span style="color:#fff;font-weight:bold;">${teamAcc}%</span></div>
+            <div style="font-size: 0.95rem; color: var(--color-accent-pink); margin-top: 6px; font-style: italic;">"${desc}"</div>
           `;
         }
       }
@@ -821,20 +901,21 @@ class GameManager {
         this.lastVoicePlayTime = Date.now();
       }
 
-      // 更新對抗模式搶答漂浮文字
+      // 更新動態得分與連擊漂浮文字 (支援 dtScale)
       for (let i = this.vsTexts.length - 1; i >= 0; i--) {
         const vt = this.vsTexts[i];
-        vt.y -= 1.0; // 往上飄移
-        vt.life--;
-        vt.alpha = Math.max(0, vt.life / 50); // 隨生命遞減 Alpha
+        vt.y -= 1.25 * dtScale; // 往上飄移
+        vt.life -= dtScale;
+        const maxLife = vt.maxLife || 50;
+        vt.alpha = Math.max(0, vt.life / maxLife);
         if (vt.life <= 0) {
           this.vsTexts.splice(i, 1);
         }
       }
 
       // 遞減兩側閃爍透明度
-      if (this.p1FlashAlpha > 0) this.p1FlashAlpha -= 0.015;
-      if (this.p2FlashAlpha > 0) this.p2FlashAlpha -= 0.015;
+      if (this.p1FlashAlpha > 0) this.p1FlashAlpha = Math.max(0, this.p1FlashAlpha - 0.015 * dtScale);
+      if (this.p2FlashAlpha > 0) this.p2FlashAlpha = Math.max(0, this.p2FlashAlpha - 0.015 * dtScale);
     }
 
     // 2. 渲染畫面 (只要不是完全隱藏 Canvas 都要畫，或是每幀清除重繪)
@@ -860,7 +941,7 @@ class GameManager {
       // 繪製粒子
       particleSystem.draw(this.ctx);
 
-      // 繪製對抗模式搶答兩側閃光
+      // 繪製對抗模式搶答兩側閃光与全模式浮動飄字
       if (this.state === 'PLAYING') {
         if (this.p1FlashAlpha > 0) {
           const gradP1 = this.ctx.createLinearGradient(0, 0, GAME_WIDTH * 0.4, 0);
@@ -877,15 +958,17 @@ class GameManager {
           this.ctx.fillRect(GAME_WIDTH * 0.6, 0, GAME_WIDTH * 0.4, GAME_HEIGHT);
         }
 
-        // 繪製搶答漂浮文字
+        // 繪製得分與連擊漂浮文字
         if (this.vsTexts.length > 0) {
           this.ctx.save();
           this.vsTexts.forEach(vt => {
             this.ctx.globalAlpha = vt.alpha;
-            this.ctx.font = 'bold 26px Noto Sans TC';
+            const size = vt.fontSize || 26;
+            this.ctx.font = `900 ${size}px "Fredoka", "Noto Sans TC", sans-serif`;
             this.ctx.fillStyle = vt.color;
             this.ctx.textAlign = 'center';
-            this.ctx.strokeStyle = '#000000';
+            this.ctx.lineJoin = 'round';
+            this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
             this.ctx.lineWidth = 5;
             this.ctx.strokeText(vt.text, vt.x, vt.y);
             this.ctx.fillText(vt.text, vt.x, vt.y);
@@ -911,16 +994,42 @@ class GameManager {
     }
   }
 
-  // 繪製綠色黑板背景與手繪塗鴉風邊界
-  drawBlackboardBackground() {
-    const ctx = this.ctx;
-    
-    // 黑板深綠底色
-    ctx.fillStyle = '#1e3f20';
+  // 預先渲染靜態黑板背景快取 (含暗角、粉筆灰擦痕、手繪角花、木質粉筆槽與粉筆板擦)
+  initBlackboardCache() {
+    this.bgCanvas = document.createElement('canvas');
+    this.bgCanvas.width = GAME_WIDTH;
+    this.bgCanvas.height = GAME_HEIGHT;
+    const ctx = this.bgCanvas.getContext('2d');
+
+    // 1. 黑板深綠漸層底色 (中央柔和偏亮，四周自然暗角 Vignette)
+    const boardGrad = ctx.createRadialGradient(
+      GAME_WIDTH * 0.5, GAME_HEIGHT * 0.45, GAME_WIDTH * 0.1,
+      GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, GAME_WIDTH * 0.75
+    );
+    boardGrad.addColorStop(0, '#234926');
+    boardGrad.addColorStop(0.65, '#1d3d1f');
+    boardGrad.addColorStop(1, '#142b15');
+    ctx.fillStyle = boardGrad;
     ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-    
-    // 黑板粉筆質感的微弱點陣或網格 (Rich Aesthetics)
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.02)';
+
+    // 2. 模擬黑板擦拭後的柔和粉筆灰雲霧紋理
+    const smudges = [
+      { x: 320, y: 220, r: 240, a: 0.022 },
+      { x: 920, y: 280, r: 280, a: 0.02 },
+      { x: 580, y: 480, r: 260, a: 0.018 },
+      { x: 240, y: 520, r: 190, a: 0.016 },
+      { x: 1020, y: 510, r: 210, a: 0.018 }
+    ];
+    smudges.forEach(s => {
+      const g = ctx.createRadialGradient(s.x, s.y, 10, s.x, s.y, s.r);
+      g.addColorStop(0, `rgba(255, 255, 255, ${s.a})`);
+      g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(s.x - s.r, s.y - s.r, s.r * 2, s.r * 2);
+    });
+
+    // 3. 黑板細微參考暗格線
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.016)';
     for (let x = 0; x < GAME_WIDTH; x += 40) {
       ctx.fillRect(x, 0, 1, GAME_HEIGHT);
     }
@@ -928,28 +1037,77 @@ class GameManager {
       ctx.fillRect(0, y, GAME_WIDTH, 1);
     }
 
-    // 繪製黑板底部的木質板擦粉筆托盤視覺 (底部一條棕色條)
-    ctx.fillStyle = '#5c3a1a';
-    ctx.fillRect(0, GAME_HEIGHT - 12, GAME_WIDTH, 12);
+    // 4. 黑板內緣手繪粉筆裝飾細框與四角星點
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([12, 8]);
+    ctx.strokeRect(16, 16, GAME_WIDTH - 32, GAME_HEIGHT - 38);
+    ctx.restore();
+
+    // 5. 繪製黑板底部的立體木質粉筆槽
+    ctx.fillStyle = '#4a2e14';
+    ctx.fillRect(0, GAME_HEIGHT - 16, GAME_WIDTH, 16);
     ctx.fillStyle = '#8b5a2b';
-    ctx.fillRect(0, GAME_HEIGHT - 12, GAME_WIDTH, 4);
+    ctx.fillRect(0, GAME_HEIGHT - 16, GAME_WIDTH, 5);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.fillRect(0, GAME_HEIGHT - 16, GAME_WIDTH, 1.5);
+
+    // 6. 在粉筆槽上繪製溫馨教室小物：黑板擦與彩色粉筆
+    // 左側黑板擦
+    ctx.save();
+    ctx.fillStyle = '#334155'; // 板擦絨布深灰底
+    ctx.fillRect(85, GAME_HEIGHT - 23, 56, 7);
+    ctx.fillStyle = '#d97706'; // 板擦木柄橘棕色
+    ctx.fillRect(83, GAME_HEIGHT - 32, 60, 10);
+    ctx.fillStyle = '#fef08a';
+    ctx.fillRect(98, GAME_HEIGHT - 29, 30, 4);
+
+    // 散落的四色粉筆 (白、黃、粉紅、粉藍)
+    const chalks = [
+      { x: 165, w: 32, color: '#f8fafc' },
+      { x: 210, w: 28, color: '#fef08a' },
+      { x: 1040, w: 34, color: '#fbcfe8' },
+      { x: 1086, w: 26, color: '#93c5fd' },
+      { x: 1122, w: 30, color: '#f8fafc' }
+    ];
+    chalks.forEach(c => {
+      ctx.fillStyle = c.color;
+      ctx.fillRect(c.x, GAME_HEIGHT - 21, c.w, 6);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+      ctx.fillRect(c.x, GAME_HEIGHT - 17, c.w, 2);
+    });
+    ctx.restore();
+  }
+
+  // 繪製綠色黑板背景與遊戲警戒線
+  drawBlackboardBackground() {
+    const ctx = this.ctx;
+    
+    // 直接繪製預先快取的精緻黑板底圖 (效能極佳)
+    if (this.bgCanvas) {
+      ctx.drawImage(this.bgCanvas, 0, 0);
+    } else {
+      ctx.fillStyle = '#1e3f20';
+      ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    }
 
     // 遊戲中繪製底部一條紅色虛線 (氣球警戒線)
     if (this.state === 'PLAYING' || this.state === 'PAUSED') {
       ctx.save();
-      ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+      ctx.strokeStyle = 'rgba(248, 113, 113, 0.65)';
       ctx.lineWidth = 3;
-      ctx.setLineDash([10, 8]);
+      ctx.setLineDash([12, 8]);
       ctx.beginPath();
-      ctx.moveTo(0, GAME_HEIGHT - 60);
-      ctx.lineTo(GAME_WIDTH, GAME_HEIGHT - 60);
+      ctx.moveTo(20, GAME_HEIGHT - 60);
+      ctx.lineTo(GAME_WIDTH - 20, GAME_HEIGHT - 60);
       ctx.stroke();
 
       // 標示「警戒線」文字
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.7)';
-      ctx.font = 'bold 14px Noto Sans TC';
+      ctx.fillStyle = 'rgba(252, 165, 165, 0.8)';
+      ctx.font = 'bold 14px "Noto Sans TC", sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText('▲ 氣球落地警戒線', GAME_WIDTH - 20, GAME_HEIGHT - 70);
+      ctx.fillText('▲ 氣球落地警戒線', GAME_WIDTH - 24, GAME_HEIGHT - 68);
       ctx.restore();
     }
   }

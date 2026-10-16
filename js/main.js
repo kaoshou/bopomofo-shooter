@@ -326,19 +326,37 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     document.getElementById('setting-speed-val').textContent = speedLabels[scale] || '標準';
 
-
-
-    // 新增光槍抗抖對應
+    // 光槍抗抖對應
     let smoothText = '標準';
     if (gameSettings.gunSmoothing === 0.6) smoothText = '極速';
     if (gameSettings.gunSmoothing === 0.15) smoothText = '抗抖';
     document.getElementById('setting-smoothing-val').textContent = smoothText;
 
-    // 新增背景音樂音量百分比對應
+    // 背景音樂音量百分比對應
     document.getElementById('setting-bgm-val').textContent = gameSettings.bgmVolume === 0 ? '關閉' : `${Math.round(gameSettings.bgmVolume * 100)}%`;
 
-    // 新增遊戲時間對應
+    // 遊戲時間對應
     document.getElementById('setting-time-val').textContent = `${gameSettings.gameTime} 秒`;
+
+    // 同步加減按鈕的極限值禁用狀態 (視覺防呆回饋)
+    const setBtnDisabled = (id, isDisabled) => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = isDisabled;
+    };
+    setBtnDisabled('btn-setting-repeat-dec', gameSettings.repeatInterval <= 0);
+    setBtnDisabled('btn-setting-repeat-inc', gameSettings.repeatInterval >= 5);
+    setBtnDisabled('btn-setting-voice-dec', gameSettings.voiceVolume <= 0);
+    setBtnDisabled('btn-setting-voice-inc', gameSettings.voiceVolume >= 1.0);
+    setBtnDisabled('btn-setting-sfx-dec', gameSettings.sfxVolume <= 0);
+    setBtnDisabled('btn-setting-sfx-inc', gameSettings.sfxVolume >= 1.0);
+    setBtnDisabled('btn-setting-bgm-dec', gameSettings.bgmVolume <= 0);
+    setBtnDisabled('btn-setting-bgm-inc', gameSettings.bgmVolume >= 1.0);
+    setBtnDisabled('btn-setting-time-dec', gameSettings.gameTime <= 10);
+    setBtnDisabled('btn-setting-time-inc', gameSettings.gameTime >= 300);
+    setBtnDisabled('btn-setting-speed-dec', scale <= 0.7);
+    setBtnDisabled('btn-setting-speed-inc', scale >= 2.5);
+    setBtnDisabled('btn-setting-smoothing-dec', gameSettings.gunSmoothing <= 0.15);
+    setBtnDisabled('btn-setting-smoothing-inc', gameSettings.gunSmoothing >= 0.6);
   }
 
   // 6. 綁定暫停 Scene 事件
@@ -363,23 +381,29 @@ document.addEventListener('DOMContentLoaded', () => {
     gameManager.changeState('HOME');
   });
 
-  // 錯題溫習卡片點擊事件委派 (點擊字卡重聽正確讀音)
+  // 錯題溫習卡片點擊事件委派 (點擊字卡重聽正確讀音並顯示發音高亮)
   document.getElementById('mistakes-list')?.addEventListener('click', (e) => {
     const card = e.target.closest('.mistake-card');
     if (card) {
       const char = card.getAttribute('data-char');
       if (char) {
+        document.querySelectorAll('.mistake-card.playing').forEach(el => el.classList.remove('playing'));
+        card.classList.add('playing');
+        setTimeout(() => card.classList.remove('playing'), 650);
         audioManager.playZhuyin(char);
       }
     }
   });
 
-  // 注音發音表按鈕點擊事件委派 (點選播放注音發音)
+  // 注音發音表按鈕點擊事件委派 (點選播放注音發音並顯示發音高亮)
   document.querySelector('.zhuyin-grid')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.zhuyin-btn');
     if (btn) {
       const char = btn.getAttribute('data-char');
       if (char) {
+        document.querySelectorAll('.zhuyin-btn.playing').forEach(el => el.classList.remove('playing'));
+        btn.classList.add('playing');
+        setTimeout(() => btn.classList.remove('playing'), 650);
         audioManager.playZhuyin(char);
       }
     }

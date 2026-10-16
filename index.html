@@ -317,48 +317,55 @@
 
         <!-- 全注音符號發音表 -->
         <div class="bopomofo-table-container">
-          <h3 class="bopomofo-table-title">
-            <svg class="icon-svg" viewBox="0 0 24 24" style="width: 1.3em; height: 1.3em; color: #fef08a;"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
-            全注音符號發音表 (點擊直接重聽發音)
-          </h3>
+          <div class="bopomofo-table-header">
+            <h3 class="bopomofo-table-title" style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">
+              <svg class="icon-svg" viewBox="0 0 24 24" style="width: 1.3em; height: 1.3em; color: #fef08a;"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+              全注音符號發音表 (點擊直接重聽發音)
+            </h3>
+            <div class="zhuyin-legend">
+              <span class="legend-item consonant">聲母 (21)</span>
+              <span class="legend-item medial">介母 (3)</span>
+              <span class="legend-item vowel">韻母 (13)</span>
+            </div>
+          </div>
           <div class="zhuyin-grid">
-            <button class="zhuyin-btn" data-char="ㄅ">ㄅ</button>
-            <button class="zhuyin-btn" data-char="ㄆ">ㄆ</button>
-            <button class="zhuyin-btn" data-char="ㄇ">ㄇ</button>
-            <button class="zhuyin-btn" data-char="ㄈ">ㄈ</button>
-            <button class="zhuyin-btn" data-char="ㄉ">ㄉ</button>
-            <button class="zhuyin-btn" data-char="ㄊ">ㄊ</button>
-            <button class="zhuyin-btn" data-char="ㄋ">ㄋ</button>
-            <button class="zhuyin-btn" data-char="ㄌ">ㄌ</button>
-            <button class="zhuyin-btn" data-char="ㄍ">ㄍ</button>
-            <button class="zhuyin-btn" data-char="ㄎ">ㄎ</button>
-            <button class="zhuyin-btn" data-char="ㄏ">ㄏ</button>
-            <button class="zhuyin-btn" data-char="ㄐ">ㄐ</button>
-            <button class="zhuyin-btn" data-char="ㄑ">ㄑ</button>
-            <button class="zhuyin-btn" data-char="ㄒ">ㄒ</button>
-            <button class="zhuyin-btn" data-char="ㄓ">ㄓ</button>
-            <button class="zhuyin-btn" data-char="ㄔ">ㄔ</button>
-            <button class="zhuyin-btn" data-char="ㄕ">ㄕ</button>
-            <button class="zhuyin-btn" data-char="ㄖ">ㄖ</button>
-            <button class="zhuyin-btn" data-char="ㄗ">ㄗ</button>
-            <button class="zhuyin-btn" data-char="ㄘ">ㄘ</button>
-            <button class="zhuyin-btn" data-char="ㄙ">ㄙ</button>
-            <button class="zhuyin-btn" data-char="ㄧ">ㄧ</button>
-            <button class="zhuyin-btn" data-char="ㄨ">ㄨ</button>
-            <button class="zhuyin-btn" data-char="ㄩ">ㄩ</button>
-            <button class="zhuyin-btn" data-char="ㄚ">ㄚ</button>
-            <button class="zhuyin-btn" data-char="ㄛ">ㄛ</button>
-            <button class="zhuyin-btn" data-char="ㄜ">ㄜ</button>
-            <button class="zhuyin-btn" data-char="ㄝ">ㄝ</button>
-            <button class="zhuyin-btn" data-char="ㄞ">ㄞ</button>
-            <button class="zhuyin-btn" data-char="ㄟ">ㄟ</button>
-            <button class="zhuyin-btn" data-char="ㄠ">ㄠ</button>
-            <button class="zhuyin-btn" data-char="ㄡ">ㄡ</button>
-            <button class="zhuyin-btn" data-char="ㄢ">ㄢ</button>
-            <button class="zhuyin-btn" data-char="ㄣ">ㄣ</button>
-            <button class="zhuyin-btn" data-char="ㄤ">ㄤ</button>
-            <button class="zhuyin-btn" data-char="ㄥ">ㄥ</button>
-            <button class="zhuyin-btn" data-char="ㄦ">ㄦ</button>
+            <button class="zhuyin-btn" data-char="ㄅ" data-group="consonant">ㄅ</button>
+            <button class="zhuyin-btn" data-char="ㄆ" data-group="consonant">ㄆ</button>
+            <button class="zhuyin-btn" data-char="ㄇ" data-group="consonant">ㄇ</button>
+            <button class="zhuyin-btn" data-group="consonant" data-char="ㄈ">ㄈ</button>
+            <button class="zhuyin-btn" data-char="ㄉ" data-group="consonant">ㄉ</button>
+            <button class="zhuyin-btn" data-char="ㄊ" data-group="consonant">ㄊ</button>
+            <button class="zhuyin-btn" data-char="ㄋ" data-group="consonant">ㄋ</button>
+            <button class="zhuyin-btn" data-char="ㄌ" data-group="consonant">ㄌ</button>
+            <button class="zhuyin-btn" data-char="ㄍ" data-group="consonant">ㄍ</button>
+            <button class="zhuyin-btn" data-char="ㄎ" data-group="consonant">ㄎ</button>
+            <button class="zhuyin-btn" data-char="ㄏ" data-group="consonant">ㄏ</button>
+            <button class="zhuyin-btn" data-char="ㄐ" data-group="consonant">ㄐ</button>
+            <button class="zhuyin-btn" data-char="ㄑ" data-group="consonant">ㄑ</button>
+            <button class="zhuyin-btn" data-char="ㄒ" data-group="consonant">ㄒ</button>
+            <button class="zhuyin-btn" data-char="ㄓ" data-group="consonant">ㄓ</button>
+            <button class="zhuyin-btn" data-char="ㄔ" data-group="consonant">ㄔ</button>
+            <button class="zhuyin-btn" data-char="ㄕ" data-group="consonant">ㄕ</button>
+            <button class="zhuyin-btn" data-char="ㄖ" data-group="consonant">ㄖ</button>
+            <button class="zhuyin-btn" data-char="ㄗ" data-group="consonant">ㄗ</button>
+            <button class="zhuyin-btn" data-char="ㄘ" data-group="consonant">ㄘ</button>
+            <button class="zhuyin-btn" data-char="ㄙ" data-group="consonant">ㄙ</button>
+            <button class="zhuyin-btn" data-char="ㄧ" data-group="medial">ㄧ</button>
+            <button class="zhuyin-btn" data-char="ㄨ" data-group="medial">ㄨ</button>
+            <button class="zhuyin-btn" data-char="ㄩ" data-group="medial">ㄩ</button>
+            <button class="zhuyin-btn" data-char="ㄚ" data-group="vowel">ㄚ</button>
+            <button class="zhuyin-btn" data-char="ㄛ" data-group="vowel">ㄛ</button>
+            <button class="zhuyin-btn" data-char="ㄜ" data-group="vowel">ㄜ</button>
+            <button class="zhuyin-btn" data-char="ㄝ" data-group="vowel">ㄝ</button>
+            <button class="zhuyin-btn" data-char="ㄞ" data-group="vowel">ㄞ</button>
+            <button class="zhuyin-btn" data-char="ㄟ" data-group="vowel">ㄟ</button>
+            <button class="zhuyin-btn" data-char="ㄠ" data-group="vowel">ㄠ</button>
+            <button class="zhuyin-btn" data-char="ㄡ" data-group="vowel">ㄡ</button>
+            <button class="zhuyin-btn" data-char="ㄢ" data-group="vowel">ㄢ</button>
+            <button class="zhuyin-btn" data-char="ㄣ" data-group="vowel">ㄣ</button>
+            <button class="zhuyin-btn" data-char="ㄤ" data-group="vowel">ㄤ</button>
+            <button class="zhuyin-btn" data-char="ㄥ" data-group="vowel">ㄥ</button>
+            <button class="zhuyin-btn" data-char="ㄦ" data-group="vowel">ㄦ</button>
           </div>
         </div>
       </div>
@@ -415,7 +422,7 @@
             機器學習手勢識別引擎（本機離線載入）。
             <ul>
               <li><b>授權協議</b>：依據 Apache License 2.0 開源協議授權使用。</li>
-              <li><b>主要用途</b>：用於偵測玩家 Webcam 攝影機鏡頭影像、即時追蹤手部 21 個關鍵骨架節點，並分析食指準心位置與拇指食指捏合射擊手勢。</li>
+              <li><b>主要用途</b>：用於偵測玩家 Webcam 攝影機鏡頭影像、即時追蹤手部 21 個關鍵骨架節點，並分析手掌中心準心位置與空中握拳（抓取）射擊手勢。</li>
             </ul>
           </li>
         </ul>
