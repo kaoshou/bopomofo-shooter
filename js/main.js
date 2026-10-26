@@ -7,6 +7,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 2. 綁定首頁 Scene 事件
   document.getElementById('btn-start-game').addEventListener('click', () => {
+    gameManager.setGameCategory('zhuyin');
+    gameManager.changeState('MODE_SELECT');
+  });
+
+  document.getElementById('btn-start-arcade')?.addEventListener('click', () => {
+    gameManager.setGameCategory('arcade');
     gameManager.changeState('MODE_SELECT');
   });
 
@@ -48,6 +54,16 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // 3. 綁定模式與難度選擇 Scene 事件
+  document.getElementById('btn-cat-zhuyin')?.addEventListener('click', () => {
+    gameManager.setGameCategory('zhuyin');
+    audioManager.playCorrect();
+  });
+
+  document.getElementById('btn-cat-arcade')?.addEventListener('click', () => {
+    gameManager.setGameCategory('arcade');
+    audioManager.playCorrect();
+  });
+
   const btnType1p = document.getElementById('btn-player-type-1p');
   const btnType2p = document.getElementById('btn-player-type-2p');
   const container1p = document.getElementById('mode-1p-container');
@@ -412,7 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 8. 綁定 HUD 內的按鈕事件
   document.getElementById('btn-replay-audio').addEventListener('click', (e) => {
     e.stopPropagation(); // 阻止點擊穿透到 Canvas 射擊
-    if (gameManager.state === 'PLAYING') {
+    if (gameManager.state === 'PLAYING' && gameManager.gameCategory === 'zhuyin') {
       audioManager.playZhuyin(gameManager.targetChar);
     }
   });
@@ -433,10 +449,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     
-    // 空白鍵 (Space) 重聽語音
+    // 空白鍵 (Space) 重聽語音 (僅限注音聽音模式)
     if (e.key === ' ' || e.key === 'Spacebar') {
       // 只有在遊戲進行中才作用，並防止網頁滾動
-      if (gameManager.state === 'PLAYING') {
+      if (gameManager.state === 'PLAYING' && gameManager.gameCategory === 'zhuyin') {
         e.preventDefault();
         audioManager.playZhuyin(gameManager.targetChar);
       }

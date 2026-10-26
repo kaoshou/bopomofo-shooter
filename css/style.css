@@ -1309,4 +1309,19 @@ body {
   box-shadow: 0 0 20px rgba(74, 222, 128, 0.6);
 }
 
+/* 炸彈爆炸強烈畫面震動特效 */
+.shake-screen {
+  animation: screenShake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes screenShake {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  15% { transform: translate(-10px, -6px) rotate(-1deg); }
+  30% { transform: translate(10px, 6px) rotate(1deg); }
+  45% { transform: translate(-8px, 5px) rotate(-0.8deg); }
+  60% { transform: translate(8px, -5px) rotate(0.8deg); }
+  75% { transform: translate(-4px, 3px) rotate(-0.4deg); }
+  90% { transform: translate(4px, -2px) rotate(0.4deg); }
+}
+
 

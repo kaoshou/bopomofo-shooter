@@ -454,6 +454,106 @@ class AudioManager {
     osc.start();
     osc.stop(this.ctx.currentTime + 0.09);
   }
+
+  // 播放夜市氣球清脆爆破音 (啵！隨連擊數微幅提高音高)
+  playBalloonPop(combo = 1) {
+    this.initAudioContext();
+    if (!this.ctx) return;
+
+    const time = this.ctx.currentTime;
+    const vol = typeof gameSettings !== 'undefined' ? gameSettings.sfxVolume : 0.8;
+    const semitones = Math.min(14, Math.max(0, combo - 1));
+    const baseFreq = 320 * Math.pow(1.045, semitones);
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(baseFreq, time);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 2.4, time + 0.065);
+
+    gain.gain.setValueAtTime(0.28 * vol, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+
+    osc.start(time);
+    osc.stop(time + 0.085);
+  }
+
+  // 播放擊中黃金氣球 / 加秒氣球的閃亮獎勵音效
+  playBonusHit() {
+    this.initAudioContext();
+    if (!this.ctx) return;
+
+    const time = this.ctx.currentTime;
+    const vol = typeof gameSettings !== 'undefined' ? gameSettings.sfxVolume : 0.8;
+    const freqs = [783.99, 1046.5, 1318.5]; // G5 -> C6 -> E6
+
+    freqs.forEach((f, idx) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(f, time + idx * 0.055);
+      gain.gain.setValueAtTime(0.24 * vol, time + idx * 0.055);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + idx * 0.055 + 0.18);
+
+      osc.start(time + idx * 0.055);
+      osc.stop(time + idx * 0.055 + 0.19);
+    });
+  }
+
+  // 播放誤射炸彈的震撼爆炸音效 (白噪音濾波 + 低頻衝擊波)
+  playBombExplode() {
+    this.initAudioContext();
+    if (!this.ctx) return;
+
+    const time = this.ctx.currentTime;
+    const vol = typeof gameSettings !== 'undefined' ? gameSettings.sfxVolume : 0.8;
+
+    // 1. 低頻震撼波
+    const osc = this.ctx.createOscillator();
+    const oscGain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(140, time);
+    osc.frequency.exponentialRampToValueAtTime(28, time + 0.45);
+    oscGain.gain.setValueAtTime(0.45 * vol, time);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, time + 0.48);
+    osc.connect(oscGain);
+    oscGain.connect(this.ctx.destination);
+    osc.start(time);
+    osc.stop(time + 0.5);
+
+    // 2. 爆炸白噪音衝擊
+    const bufferSize = this.ctx.sampleRate * 0.45;
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      output[i] = Math.random() * 2 - 1;
+    }
+
+    const whiteNoise = this.ctx.createBufferSource();
+    whiteNoise.buffer = noiseBuffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(900, time);
+    filter.frequency.exponentialRampToValueAtTime(110, time + 0.42);
+
+    const noiseGain = this.ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.4 * vol, time);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.44);
+
+    whiteNoise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(this.ctx.destination);
+
+    whiteNoise.start(time);
+    whiteNoise.stop(time + 0.45);
+  }
 }
 
 // 建立全域音效管理器實例

@@ -100,6 +100,70 @@ const DIFFICULTY_CONFIG = {
   }
 };
 
+// 夜市打氣球模式 (Arcade Balloon Mode) 難度與規則設定
+const ARCADE_DIFFICULTY_CONFIG = {
+  easy: {
+    label: '歡樂夜市 (Easy)',
+    description: '純享連射快感！無炸彈干擾，氣球大且飄升慢，偶有高分黃金氣球與加秒氣球。',
+    maxBalloons: 8,         // 畫面上同時存在的標靶上限
+    speedMin: 1.15,         // 最慢上升速度 (px/frame)
+    speedMax: 2.0,          // 最快上升速度
+    spawnInterval: 450,     // 氣球連續生成間隔 (ms)
+    bombChance: 0.0,        // 炸彈出現機率 (0% 無炸彈)
+    goldChance: 0.16,       // 黃金高分小氣球機率 (+300分)
+    timeChance: 0.07,       // 時間獎勵氣球機率 (+3秒)
+    bombPenalty: 0,
+    bombInstantKill: false,
+    timeLimit: 60,
+    lives: 5
+  },
+  medium: {
+    label: '驚險炸彈 (Normal)',
+    description: '氣球飄升加快，混入危險炸彈！誤射炸彈會扣 250 分並扣除 1 點生命值。',
+    maxBalloons: 10,
+    speedMin: 1.55,
+    speedMax: 2.75,
+    spawnInterval: 360,
+    bombChance: 0.18,       // 18% 機率出現黑色炸彈
+    goldChance: 0.18,
+    timeChance: 0.07,
+    bombPenalty: 250,
+    bombInstantKill: false,
+    timeLimit: 60,
+    lives: 3
+  },
+  hard: {
+    label: '極速狂飆 (Hard)',
+    description: '高速氣球大幅搖擺！黃金氣球與炸彈比例大增，誤射炸彈扣 300 分與生命。',
+    maxBalloons: 12,
+    speedMin: 2.1,
+    speedMax: 3.6,
+    spawnInterval: 280,
+    bombChance: 0.28,       // 28% 機率出現黑色炸彈
+    goldChance: 0.22,
+    timeChance: 0.07,
+    bombPenalty: 300,
+    bombInstantKill: false,
+    timeLimit: 60,
+    lives: 3
+  },
+  boss: {
+    label: '一擊必殺 (Sudden Death)',
+    description: '終極神槍手考驗！漫天高速氣球夾雜大量炸彈，僅 1 點生命，誤擊炸彈立即出局！',
+    maxBalloons: 14,
+    speedMin: 2.35,
+    speedMax: 4.0,
+    spawnInterval: 240,
+    bombChance: 0.35,       // 35% 高密度炸彈
+    goldChance: 0.25,
+    timeChance: 0.06,
+    bombPenalty: 500,
+    bombInstantKill: true,  // 打中炸彈直接結束遊戲 (對抗模式則重扣 500 分)
+    timeLimit: 60,
+    lives: 1
+  }
+};
+
 // 全域常數設定
 const GAME_WIDTH = 1280;
 const GAME_HEIGHT = 720;

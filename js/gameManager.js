@@ -6,7 +6,8 @@ class GameManager {
     this.ctx = null;
     this.state = 'HOME'; // HOME, MODE_SELECT, TUTORIAL, CALIBRATION, PLAYING, PAUSED, RESULT
     
-    // 遊戲參數
+    // 遊戲大類與參數 ('zhuyin': 注音聽音挑戰, 'arcade': 夜市射氣球)
+    this.gameCategory = 'zhuyin';
     this.selectedMode = null; // 預設設為 null (未選取)，要求玩家手動選擇
     this.selectedDiff = 'easy'; // easy, medium, hard, boss
     this.lives = 5;
@@ -19,11 +20,18 @@ class GameManager {
     this.p2 = new Player(2, '#ef4444', 'gamepad'); // 紅色準星
     this.balloons = [];
     
-    // 題目資訊
+    // 題目資訊 (注音模式)
     this.targetChar = ''; // 目前要射擊的注音字元
     this.lastSpawnTime = 0;
     this.lastVoicePlayTime = 0; // 記錄上次語音播放的時間
     this.isGameOverTriggered = false;
+
+    // 夜市射氣球模式統計與生成計時
+    this.arcadeBalloonsPopped = 0;
+    this.arcadeGoldPopped = 0;
+    this.arcadeTimePopped = 0;
+    this.arcadeBombsHit = 0;
+    this.lastArcadeSpawnTime = 0;
 
     // Boss 關卡資訊
     this.bossHp = 15;
@@ -56,6 +64,57 @@ class GameManager {
     
     // 開始遊戲循環
     this.loop();
+  }
+
+  // 切換遊戲玩法分類 ('zhuyin' | 'arcade') 並同步更新選單介面文字
+  setGameCategory(category) {
+    this.gameCategory = category === 'arcade' ? 'arcade' : 'zhuyin';
+
+    const btnZhuyin = document.getElementById('btn-cat-zhuyin');
+    const btnArcade = document.getElementById('btn-cat-arcade');
+    const titleEl = document.getElementById('mode-select-title');
+
+    if (btnZhuyin && btnArcade) {
+      if (this.gameCategory === 'arcade') {
+        btnArcade.classList.add('btn-accent');
+        btnArcade.classList.remove('btn-gray', 'btn-primary');
+        btnZhuyin.classList.add('btn-gray');
+        btnZhuyin.classList.remove('btn-primary', 'btn-accent');
+      } else {
+        btnZhuyin.classList.add('btn-primary');
+        btnZhuyin.classList.remove('btn-gray', 'btn-accent');
+        btnArcade.classList.add('btn-gray');
+        btnArcade.classList.remove('btn-primary', 'btn-accent');
+      }
+    }
+
+    if (titleEl) {
+      titleEl.textContent = this.gameCategory === 'arcade'
+        ? '選擇模式與難度 — 🎈 夜市射氣球'
+        : '選擇模式與難度 — 🎯 注音聽音挑戰';
+    }
+
+    // 動態更新 4 張難度卡片的標題與描述
+    const zhuyinDescriptions = {
+      easy: '只出現常見 8 個符號，掉落速度慢，干擾少。適合初學者。',
+      medium: '加入更多符號，掉落速度加快，干擾氣球變多。',
+      hard: '包含所有 37 個注音，速度極快，氣球晃動，多重干擾。',
+      boss: '限時連續聽音！魔王會不斷丟出氣球，快速射擊來削減魔王血量！'
+    };
+
+    ['easy', 'medium', 'hard', 'boss'].forEach(diff => {
+      const nameEl = document.getElementById(`diff-name-${diff}`);
+      const descEl = document.getElementById(`diff-desc-${diff}`);
+      if (this.gameCategory === 'arcade' && typeof ARCADE_DIFFICULTY_CONFIG !== 'undefined') {
+        const cfg = ARCADE_DIFFICULTY_CONFIG[diff];
+        if (nameEl && cfg) nameEl.textContent = cfg.name;
+        if (descEl && cfg) descEl.textContent = cfg.desc;
+      } else if (typeof DIFFICULTY_CONFIG !== 'undefined') {
+        const cfg = DIFFICULTY_CONFIG[diff];
+        if (nameEl && cfg) nameEl.textContent = cfg.name;
+        if (descEl) descEl.textContent = zhuyinDescriptions[diff] || '';
+      }
+    });
   }
 
   // 遊戲狀態機切換
@@ -96,6 +155,7 @@ class GameManager {
 
     if (newState === 'MODE_SELECT') {
       this.selectedMode = null;
+      this.setGameCategory(this.gameCategory);
       // 重置模式按鈕樣式與開始挑戰按鈕的狀態
       if (typeof inputManager !== 'undefined') {
         inputManager.syncModeButtonsUI(null);
@@ -146,16 +206,37 @@ class GameManager {
     this.p1FlashAlpha = 0;
     this.p2FlashAlpha = 0;
     this.vsTexts = [];
+    this.arcadeBalloonsPopped = 0;
+    this.arcadeGoldPopped = 0;
+    this.arcadeTimePopped = 0;
+    this.arcadeBombsHit = 0;
     
-    const config = DIFFICULTY_CONFIG[this.selectedDiff];
+    const isArcade = this.gameCategory === 'arcade';
+    const config = isArcade ? ARCADE_DIFFICULTY_CONFIG[this.selectedDiff] : DIFFICULTY_CONFIG[this.selectedDiff];
     this.lives = config.lives;
     this.maxLives = config.lives;
     this.timeRemaining = (typeof gameSettings !== 'undefined' && gameSettings.gameTime) ? gameSettings.gameTime : config.timeLimit;
     
-    // Boss 關血量
-    if (this.selectedDiff === 'boss') {
+    // Boss 關血量 (僅注音模式使用)
+    if (!isArcade && this.selectedDiff === 'boss') {
       this.bossHp = config.bossHp;
       this.bossMaxHp = config.bossHp;
+    }
+
+    // 根據遊戲類別切換 HUD 中央顯示與重聽發音按鈕
+    const hudQuestionLabel = document.getElementById('hud-question-label');
+    const btnReplayAudio = document.getElementById('btn-replay-audio');
+    if (isArcade) {
+      if (btnReplayAudio) btnReplayAudio.classList.add('hidden');
+      if (hudQuestionLabel) {
+        const shortTitle = config.name.split(' ')[0];
+        hudQuestionLabel.innerHTML = `<span style="color: #fef08a;">🎈 ${shortTitle}</span>｜擊破: <span id="question-char" style="color: #4ade80; font-weight: 900;">0</span>`;
+      }
+    } else {
+      if (btnReplayAudio) btnReplayAudio.classList.remove('hidden');
+      if (hudQuestionLabel) {
+        hudQuestionLabel.innerHTML = `目標發音: <span id="question-char" style="color: var(--color-accent-yellow); font-weight: 900;">？</span>`;
+      }
     }
 
     // 重設玩家
@@ -193,14 +274,94 @@ class GameManager {
       }
     }, 1000);
 
-    // 開始出題
-    audioManager.initAudioContext(); // 確保 AudioContext 已啟動
-    setTimeout(() => this.nextQuestion(), 500);
+    // 確保 AudioContext 已啟動
+    audioManager.initAudioContext();
+
+    if (isArcade) {
+      // 夜市射氣球模式：立即生成第一波氣球
+      this.spawnInitialArcadeWave();
+      this.lastArcadeSpawnTime = performance.now();
+    } else {
+      // 注音聽音挑戰：開始出題
+      setTimeout(() => this.nextQuestion(), 500);
+    }
   }
 
-  // 產生下一題
+  // 夜市射氣球模式：開局預先生出第一波氣球
+  spawnInitialArcadeWave() {
+    const count = 4;
+    for (let i = 0; i < count; i++) {
+      const initY = GAME_HEIGHT + 20 + i * 55;
+      this.spawnArcadeBalloon(initY, i === 0); // 第一顆保證為一般氣球
+    }
+  }
+
+  // 夜市射氣球模式：連續生成單顆氣球或炸彈 (由底部往上飄升)
+  spawnArcadeBalloon(initialY = null, forceNormal = false) {
+    if (this.state !== 'PLAYING' || this.gameCategory !== 'arcade') return;
+
+    const config = ARCADE_DIFFICULTY_CONFIG[this.selectedDiff];
+    const activeCount = this.balloons.filter(b => b.active && !b.isPopping).length;
+    if (activeCount >= config.maxBalloons) return;
+
+    // 決定標靶種類 ('normal' | 'gold' | 'time' | 'bomb')
+    let arcadeType = 'normal';
+    if (!forceNormal) {
+      const activeBombs = this.balloons.filter(b => b.active && !b.isPopping && b.arcadeType === 'bomb').length;
+      const maxAllowedBombs = Math.ceil(config.maxBalloons * 0.42);
+      const roll = Math.random();
+
+      if (roll < config.bombChance && activeBombs < maxAllowedBombs) {
+        arcadeType = 'bomb';
+      } else if (roll < config.bombChance + config.goldChance) {
+        arcadeType = 'gold';
+      } else if (roll < config.bombChance + config.goldChance + config.timeChance) {
+        arcadeType = 'time';
+      }
+    }
+
+    // 決定尺寸與飄升速度
+    let speedScale = typeof gameSettings !== 'undefined' ? gameSettings.speedScale : 1.0;
+    // 最後 20 秒加速製造緊張高潮
+    const timeBoost = this.timeRemaining <= 15 ? 1.22 : (this.timeRemaining <= 30 ? 1.1 : 1.0);
+    const baseSpeed = config.speedMin + Math.random() * (config.speedMax - config.speedMin);
+
+    let radius = 48;
+    let speed = baseSpeed * speedScale * timeBoost;
+
+    if (arcadeType === 'gold') {
+      radius = 36; // 黃金氣球較小顆、飛得特別快
+      speed *= 1.35;
+    } else if (arcadeType === 'time') {
+      radius = 44;
+      speed *= 1.12;
+    } else if (arcadeType === 'bomb') {
+      radius = 45;
+      speed *= 0.96;
+    } else {
+      radius = 46 + Math.floor(Math.random() * 7);
+    }
+
+    // 挑選不易與底部剛生成的氣球重疊的 X 座標
+    let x = 100 + Math.random() * (GAME_WIDTH - 200);
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const candidateX = 95 + Math.random() * (GAME_WIDTH - 190);
+      const tooClose = this.balloons.some(b => b.active && b.y > GAME_HEIGHT - 160 && Math.abs(b.x - candidateX) < 105);
+      if (!tooClose) {
+        x = candidateX;
+        break;
+      }
+    }
+
+    const y = initialY !== null ? initialY : (GAME_HEIGHT + radius + 15 + Math.random() * 35);
+    const isTarget = arcadeType !== 'bomb';
+
+    this.balloons.push(new Balloon('', x, y, radius, speed, isTarget, this.selectedDiff, arcadeType));
+  }
+
+  // 產生下一題 (注音聽音模式)
   nextQuestion() {
-    if (this.state !== 'PLAYING') return;
+    if (this.state !== 'PLAYING' || this.gameCategory !== 'zhuyin') return;
 
     const config = DIFFICULTY_CONFIG[this.selectedDiff];
     
@@ -290,7 +451,13 @@ class GameManager {
     const isCoop = this.selectedMode && this.selectedMode.includes('coop');
     const isVs = this.selectedMode && this.selectedMode.includes('vs');
 
-    // 從後往前檢查氣球，確保先擊中最上層的
+    // 分流：夜市射氣球模式碰撞與獎懲判定
+    if (this.gameCategory === 'arcade') {
+      this.handleArcadeShootHit(playerNum, shooter, x, y, isCoop, isVs);
+      return;
+    }
+
+    // 從後往前檢查氣球，確保先擊中最上層的 (注音聽音模式)
     for (let i = this.balloons.length - 1; i >= 0; i--) {
       const b = this.balloons[i];
       if (b.active && b.checkCollision(x, y)) {
@@ -441,6 +608,172 @@ class GameManager {
     }
   }
 
+  // 夜市射氣球模式：處理射擊命中氣球或誤擊炸彈
+  handleArcadeShootHit(playerNum, shooter, x, y, isCoop, isVs) {
+    const config = ARCADE_DIFFICULTY_CONFIG[this.selectedDiff];
+
+    for (let i = this.balloons.length - 1; i >= 0; i--) {
+      const b = this.balloons[i];
+      if (b.active && !b.isPopping && b.checkCollision(x, y)) {
+        b.isPopping = true;
+        this.flashDuration = 2;
+
+        if (b.arcadeType === 'bomb') {
+          // 💥 誤擊危險炸彈！
+          this.arcadeBombsHit++;
+          shooter.shotsWrong++;
+
+          if (isCoop) {
+            this.p1.resetCombo();
+            this.p2.resetCombo();
+          } else {
+            shooter.resetCombo();
+          }
+
+          const penalty = config.bombPenalty || 250;
+          if (isCoop) {
+            this.p1.score = Math.max(0, this.p1.score - penalty);
+            this.p2.score = Math.max(0, this.p2.score - penalty);
+          } else {
+            shooter.score = Math.max(0, shooter.score - penalty);
+          }
+
+          // 強烈雙層爆炸粒子與震波
+          particleSystem.spawnExplosion(b.x, b.y, '#ef4444', 36, false);
+          particleSystem.spawnExplosion(b.x, b.y, '#f97316', 22, false);
+          audioManager.playBombExplode();
+
+          // 畫面紅閃與強烈震動
+          const container = document.getElementById('game-container');
+          if (container) {
+            container.classList.add('flash-red', 'shake-screen');
+            setTimeout(() => container.classList.remove('flash-red', 'shake-screen'), 430);
+          }
+
+          this.vsTexts.push({
+            text: isVs ? `💥 P${playerNum} 誤擊炸彈! -${penalty}` : `💥 爆炸! -${penalty}`,
+            x: b.x,
+            y: b.y - 18,
+            alpha: 1.0,
+            color: '#f87171',
+            fontSize: 30,
+            life: 52,
+            maxLife: 52
+          });
+
+          if (isVs) {
+            // 雙人對抗模式：只重扣誤擊者分數，不扣共用生命
+            this.showFeedback(`💥 P${playerNum} 誤擊炸彈！`, 'wrong');
+            this.updateHUD();
+          } else if (config.bombInstantKill) {
+            // 一擊必殺模式：誤擊炸彈直接出局
+            this.lives = 0;
+            this.showFeedback('💥 引爆炸彈！一擊出局！', 'wrong');
+            this.updateHUD();
+            this.endGame(false);
+          } else {
+            this.showFeedback('💥 誤擊炸彈！', 'wrong');
+            this.deductLife();
+            this.updateHUD();
+          }
+          break;
+
+        } else {
+          // 🎈 擊中得分氣球 ('normal' | 'gold' | 'time')
+          this.arcadeBalloonsPopped++;
+          shooter.shotsHit++;
+
+          if (isCoop) {
+            this.p1.addCombo();
+            this.p2.addCombo();
+          } else {
+            shooter.addCombo();
+          }
+
+          let basePoints = 100;
+          let comboBonus = shooter.combo * 12;
+          if (b.arcadeType === 'gold') {
+            this.arcadeGoldPopped++;
+            basePoints = 300;
+            comboBonus = shooter.combo * 25;
+          } else if (b.arcadeType === 'time') {
+            this.arcadeTimePopped++;
+            basePoints = 150;
+            this.timeRemaining += 3; // 獎勵 +3 秒
+          }
+
+          const points = basePoints + comboBonus;
+          if (isCoop) {
+            this.p1.score += points;
+            this.p2.score += points;
+          } else {
+            shooter.score += points;
+          }
+
+          // 產生繽紛粒子特效
+          particleSystem.spawnExplosion(b.x, b.y, b.color, b.arcadeType === 'gold' ? 36 : 24, true);
+
+          // 播放音效
+          if (b.arcadeType === 'gold' || b.arcadeType === 'time') {
+            audioManager.playBonusHit();
+            this.showFeedback(b.arcadeType === 'gold' ? '★ 黃金氣球 +300！' : '⏱️ 時間 +3 秒！', 'correct');
+          } else if (shooter.combo >= 5 && shooter.combo % 5 === 0) {
+            audioManager.playCombo(shooter.combo);
+          } else {
+            audioManager.playBalloonPop(shooter.combo);
+          }
+
+          // 動態飄字回饋
+          if (isVs) {
+            if (playerNum === 1) this.p1FlashAlpha = 0.35;
+            else this.p2FlashAlpha = 0.35;
+          }
+
+          let mainPopupText = isVs ? `P${playerNum} +${points}` : `+${points}`;
+          let popupColor = isVs ? (playerNum === 1 ? '#60a5fa' : '#f87171') : '#4ade80';
+          let popupSize = 28;
+
+          if (b.arcadeType === 'gold') {
+            mainPopupText = isVs ? `★ P${playerNum} 黃金 +${points}!` : `★ 黃金氣球 +${points}!`;
+            popupColor = '#facc15';
+            popupSize = 31;
+          } else if (b.arcadeType === 'time') {
+            mainPopupText = isVs ? `⏱️ P${playerNum} +3秒! +${points}` : `⏱️ 時間 +3秒! +${points}`;
+            popupColor = '#38bdf8';
+            popupSize = 29;
+          }
+
+          this.vsTexts.push({
+            text: mainPopupText,
+            x: b.x,
+            y: b.y - 15,
+            alpha: 1.0,
+            color: popupColor,
+            fontSize: popupSize,
+            life: 46,
+            maxLife: 46
+          });
+
+          if (shooter.combo >= 2) {
+            this.vsTexts.push({
+              text: `${shooter.combo} COMBO!`,
+              x: b.x,
+              y: b.y - 46,
+              alpha: 1.0,
+              color: '#fef08a',
+              fontSize: 22,
+              life: 44,
+              maxLife: 44
+            });
+          }
+
+          this.updateHUD();
+          break;
+        }
+      }
+    }
+  }
+
   // 扣減生命值
   deductLife() {
     this.lives--;
@@ -468,6 +801,8 @@ class GameManager {
 
   // 更新遊戲畫面上方的 HUD
   updateHUD() {
+    const isArcade = this.gameCategory === 'arcade';
+
     // 1P 分數與 Combo
     document.getElementById('p1-score').textContent = this.p1.score;
     const p1ComboEl = document.getElementById('p1-combo');
@@ -490,6 +825,14 @@ class GameManager {
       }
     }
 
+    // 夜市射氣球模式：即時更新中央擊破數
+    if (isArcade) {
+      const qChar = document.getElementById('question-char');
+      if (qChar) {
+        qChar.textContent = `${this.arcadeBalloonsPopped}`;
+      }
+    }
+
     // 剩餘時間與最後 10 秒緊急閃爍狀態
     const timerValEl = document.getElementById('game-timer');
     if (timerValEl) {
@@ -508,8 +851,8 @@ class GameManager {
     const livesContainer = document.getElementById('hud-lives-container');
     livesContainer.innerHTML = '';
     
-    if (this.selectedDiff === 'boss') {
-      // Boss 關卡：顯示動態漸層血量槽 + 玩家愛心生命值
+    if (!isArcade && this.selectedDiff === 'boss') {
+      // 注音模式 Boss 關卡：顯示動態漸層血量槽 + 玩家愛心生命值
       const hpPercent = Math.max(0, Math.min(100, (this.bossHp / this.bossMaxHp) * 100));
       const bossWrapper = document.createElement('div');
       bossWrapper.className = 'boss-hp-wrapper';
@@ -525,6 +868,13 @@ class GameManager {
         <span class="boss-hp-text">${this.bossHp}/${this.bossMaxHp}</span>
       `;
       livesContainer.appendChild(bossWrapper);
+    } else if (isArcade && this.selectedDiff === 'boss') {
+      // 夜市模式「一擊必殺」難度：顯示高張力警示徽章
+      const suddenDeathBadge = document.createElement('span');
+      suddenDeathBadge.className = 'boss-hp-label';
+      suddenDeathBadge.style.marginRight = '6px';
+      suddenDeathBadge.innerHTML = `⚡ 一擊必殺`;
+      livesContainer.appendChild(suddenDeathBadge);
     }
 
     // 繪製玩家愛心 SVG (對抗模式不扣命故不需愛心，其餘含 Boss 模式皆顯示玩家生命)
@@ -552,7 +902,11 @@ class GameManager {
     clearInterval(this.timerInterval);
 
     // 播放音效
-    const isWin = isTimeUpOrWin && (this.selectedDiff !== 'boss' || this.bossHp <= 0);
+    const isArcade = this.gameCategory === 'arcade';
+    const isWin = isArcade
+      ? (isTimeUpOrWin && this.lives > 0)
+      : (isTimeUpOrWin && (this.selectedDiff !== 'boss' || this.bossHp <= 0));
+
     if (isWin) {
       audioManager.playWin();
     } else {
@@ -567,17 +921,25 @@ class GameManager {
 
   // 填寫結算資料
   populateResults() {
-    const isBossWin = this.selectedDiff === 'boss' && this.bossHp <= 0;
+    const isArcade = this.gameCategory === 'arcade';
+    const isBossWin = !isArcade && this.selectedDiff === 'boss' && this.bossHp <= 0;
     
-    // 設定標題，移除 Emoji 🎉 / 💀，使用 SVG 圖示
+    // 設定標題，使用 SVG 圖示
     const titleEl = document.getElementById('result-title');
     const winIcon = `<svg class="icon-svg icon-svg-fill" viewBox="0 0 24 24" style="color: #facc15; margin-right: 8px; width: 1.5em; height: 1.5em; vertical-align: middle;"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"></path><rect x="5" y="18" width="14" height="2"></rect></svg>`;
     const loseIcon = `<svg class="icon-svg" viewBox="0 0 24 24" style="color: #f87171; margin-right: 8px; width: 1.5em; height: 1.5em; vertical-align: middle;"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="15.01" y2="9"></line><line x1="9" y1="9" x2="9.01" y2="9"></line><path d="M16 16s-1.5-2-4-2-4 2-4 2"></path></svg>`;
     
-    if (this.selectedDiff === 'boss') {
+    if (isArcade) {
+      titleEl.innerHTML = this.lives > 0 ? `${winIcon}夜市神射手！` : `${loseIcon}引爆炸彈出局！`;
+    } else if (this.selectedDiff === 'boss') {
       titleEl.innerHTML = isBossWin ? `${winIcon}擊敗大魔王！` : `${loseIcon}挑戰失敗！`;
     } else {
       titleEl.innerHTML = this.lives > 0 ? `${winIcon}挑戰成功！` : `${loseIcon}挑戰失敗！`;
+    }
+
+    const resHitLabel = document.getElementById('res-hit-label');
+    if (resHitLabel) {
+      resHitLabel.textContent = isArcade ? '擊破氣球 / 射擊次數：' : '答對題數 / 射擊次數：';
     }
 
     const singleRes = document.getElementById('single-results');
@@ -661,21 +1023,22 @@ class GameManager {
             desc = '氣球漏得不多，分工還可以再更細密一些，下次一定能拿 S 級！';
           }
           
+          const hitUnit = isArcade ? '顆' : '題';
           evalEl.innerHTML = `
             <div style="font-size: 1.3rem; font-weight: 900; color: var(--color-accent-yellow); margin-bottom: 8px;">團隊綜合評價：${rank}</div>
-            <div style="font-size: 1rem; color: rgba(255,255,255,0.85); line-height: 1.6;">團隊共同總分：<span style="color:#fef08a;font-weight:bold;">${teamScore}</span> ｜ 聯手擊破：<span style="color:#4ade80;font-weight:bold;">${totalHits} 題</span> (1P: ${this.p1.shotsHit} / 2P: ${this.p2.shotsHit}) ｜ 團隊命中率：<span style="color:#fff;font-weight:bold;">${teamAcc}%</span></div>
+            <div style="font-size: 1rem; color: rgba(255,255,255,0.85); line-height: 1.6;">團隊共同總分：<span style="color:#fef08a;font-weight:bold;">${teamScore}</span> ｜ 聯手擊破：<span style="color:#4ade80;font-weight:bold;">${totalHits} ${hitUnit}</span> (1P: ${this.p1.shotsHit} / 2P: ${this.p2.shotsHit}) ｜ 團隊命中率：<span style="color:#fff;font-weight:bold;">${teamAcc}%</span></div>
             <div style="font-size: 0.95rem; color: var(--color-accent-pink); margin-top: 6px; font-style: italic;">"${desc}"</div>
           `;
         }
       }
     }
 
-    // 渲染錯題溫習區
+    // 渲染錯題溫習區 (僅注音聽音模式顯示)
     const mistakesContainer = document.getElementById('mistakes-review-container');
     const mistakesList = document.getElementById('mistakes-list');
     
     if (mistakesContainer && mistakesList) {
-      if (this.mistakes && this.mistakes.length > 0) {
+      if (!isArcade && this.mistakes && this.mistakes.length > 0) {
         mistakesContainer.classList.remove('hidden');
         
         // 進行錯題去重：優先保留「選錯字」而非「漏答」的卡片
@@ -820,7 +1183,6 @@ class GameManager {
     // 1. 更新邏輯 (僅在 PLAYING 狀態下更新物理)
     if (this.state === 'PLAYING') {
 
-
       // 更新玩家位置
       if (this.p1.inputType === 'mouse') {
         this.p1.x = inputManager.mouseX;
@@ -851,54 +1213,79 @@ class GameManager {
       // 更新粒子特效
       particleSystem.update(dtScale);
 
-      // 更新氣球位置並檢查越界
-      let correctCharMissed = false;
-      
-      for (let i = this.balloons.length - 1; i >= 0; i--) {
-        const b = this.balloons[i];
-        const status = b.update(dtScale);
-        
-        if (status === 'missed') {
-          if (b.isCorrect) {
-            correctCharMissed = true; // 正確答案氣球漏答了
-            
-            // 紀錄漏答
-            this.mistakes.push({
-              correct: this.targetChar,
-              selected: '漏答',
-              type: 'miss'
-            });
+      if (this.gameCategory === 'arcade') {
+        // 🎈 夜市射氣球模式：連續生球與更新
+        const config = ARCADE_DIFFICULTY_CONFIG[this.selectedDiff];
+        const dynamicInterval = config.spawnInterval * (this.timeRemaining <= 15 ? 0.76 : (this.timeRemaining <= 30 ? 0.88 : 1.0));
+
+        if (now - this.lastArcadeSpawnTime >= dynamicInterval) {
+          this.spawnArcadeBalloon();
+          // 若場上氣球過少，額外補生一顆，維持夜市攤位的豐富緊湊感
+          const activeCount = this.balloons.filter(b => b.active && !b.isPopping).length;
+          if (activeCount < Math.floor(config.maxBalloons * 0.45)) {
+            this.spawnArcadeBalloon();
           }
-          this.balloons.splice(i, 1);
-        } else if (!b.active) {
-          // 被擊碎的氣球在此移除
-          this.balloons.splice(i, 1);
-        }
-      }
-
-      // 處理正確答案氣球掉出底部的懲罰
-      if (correctCharMissed) {
-        this.p1.resetCombo();
-        this.p2.resetCombo();
-        this.updateHUD();
-
-        audioManager.playWrong();
-        this.showFeedback('漏答了！', 'wrong');
-
-        const isVs = this.selectedMode && this.selectedMode.includes('vs');
-        if (!isVs) {
-          this.deductLife();
+          this.lastArcadeSpawnTime = now;
         }
 
-        // 直接進入下一題
-        setTimeout(() => this.nextQuestion(), 500);
-      }
+        for (let i = this.balloons.length - 1; i >= 0; i--) {
+          const b = this.balloons[i];
+          const status = b.update(dtScale);
+          if (status === 'escaped' || !b.active) {
+            this.balloons.splice(i, 1);
+          }
+        }
 
-      // 未答對前，依照設定的頻率自動重複播放題目語音
-      const repeatMs = typeof gameSettings !== 'undefined' ? gameSettings.repeatInterval * 1000 : 3000;
-      if (repeatMs > 0 && Date.now() - this.lastVoicePlayTime >= repeatMs && this.balloons.some(b => b.active && b.isCorrect)) {
-        audioManager.playZhuyin(this.targetChar);
-        this.lastVoicePlayTime = Date.now();
+      } else {
+        // 🎯 注音聽音挑戰模式：更新氣球位置並檢查越界
+        let correctCharMissed = false;
+        
+        for (let i = this.balloons.length - 1; i >= 0; i--) {
+          const b = this.balloons[i];
+          const status = b.update(dtScale);
+          
+          if (status === 'missed') {
+            if (b.isCorrect) {
+              correctCharMissed = true; // 正確答案氣球漏答了
+              
+              // 紀錄漏答
+              this.mistakes.push({
+                correct: this.targetChar,
+                selected: '漏答',
+                type: 'miss'
+              });
+            }
+            this.balloons.splice(i, 1);
+          } else if (!b.active) {
+            // 被擊碎的氣球在此移除
+            this.balloons.splice(i, 1);
+          }
+        }
+
+        // 處理正確答案氣球掉出底部的懲罰
+        if (correctCharMissed) {
+          this.p1.resetCombo();
+          this.p2.resetCombo();
+          this.updateHUD();
+
+          audioManager.playWrong();
+          this.showFeedback('漏答了！', 'wrong');
+
+          const isVs = this.selectedMode && this.selectedMode.includes('vs');
+          if (!isVs) {
+            this.deductLife();
+          }
+
+          // 直接進入下一題
+          setTimeout(() => this.nextQuestion(), 500);
+        }
+
+        // 未答對前，依照設定的頻率自動重複播放題目語音
+        const repeatMs = typeof gameSettings !== 'undefined' ? gameSettings.repeatInterval * 1000 : 3000;
+        if (repeatMs > 0 && Date.now() - this.lastVoicePlayTime >= repeatMs && this.balloons.some(b => b.active && b.isCorrect)) {
+          audioManager.playZhuyin(this.targetChar);
+          this.lastVoicePlayTime = Date.now();
+        }
       }
 
       // 更新動態得分與連擊漂浮文字 (支援 dtScale)
@@ -1080,7 +1467,7 @@ class GameManager {
     ctx.restore();
   }
 
-  // 繪製綠色黑板背景與遊戲警戒線
+  // 繪製綠色黑板背景與遊戲警戒線 / 夜市慶典裝飾
   drawBlackboardBackground() {
     const ctx = this.ctx;
     
@@ -1092,23 +1479,59 @@ class GameManager {
       ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
     }
 
-    // 遊戲中繪製底部一條紅色虛線 (氣球警戒線)
     if (this.state === 'PLAYING' || this.state === 'PAUSED') {
-      ctx.save();
-      ctx.strokeStyle = 'rgba(248, 113, 113, 0.65)';
-      ctx.lineWidth = 3;
-      ctx.setLineDash([12, 8]);
-      ctx.beginPath();
-      ctx.moveTo(20, GAME_HEIGHT - 60);
-      ctx.lineTo(GAME_WIDTH - 20, GAME_HEIGHT - 60);
-      ctx.stroke();
+      if (this.gameCategory === 'arcade') {
+        // 夜市射氣球模式：於畫面上方兩側繪製手繪粉筆風「夜市慶典三角彩旗」與攤位提示
+        ctx.save();
+        const flagColors = ['#f87171', '#facc15', '#4ade80', '#38bdf8', '#c084fc', '#fb923c'];
+        const flagCount = 18;
+        const spacing = (GAME_WIDTH - 60) / flagCount;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(20, 82);
+        ctx.quadraticCurveTo(GAME_WIDTH * 0.5, 108, GAME_WIDTH - 20, 82);
+        ctx.stroke();
 
-      // 標示「警戒線」文字
-      ctx.fillStyle = 'rgba(252, 165, 165, 0.8)';
-      ctx.font = 'bold 14px "Noto Sans TC", sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText('▲ 氣球落地警戒線', GAME_WIDTH - 24, GAME_HEIGHT - 68);
-      ctx.restore();
+        for (let i = 0; i < flagCount; i++) {
+          const fx = 30 + i * spacing;
+          const t = (i + 0.5) / flagCount;
+          const fy = 82 + 4 * t * (1 - t) * 26;
+          ctx.fillStyle = flagColors[i % flagColors.length];
+          ctx.globalAlpha = 0.28;
+          ctx.beginPath();
+          ctx.moveTo(fx + 6, fy);
+          ctx.lineTo(fx + spacing - 6, fy);
+          ctx.lineTo(fx + spacing * 0.5, fy + 22);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // 底部標示夜市氣球升起區與特殊標靶圖例
+        ctx.globalAlpha = 0.75;
+        ctx.fillStyle = '#fef08a';
+        ctx.font = 'bold 14px "Noto Sans TC", sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText('🎈 彩色氣球 +100 ｜ ★ 黃金氣球 +300 ｜ ⏱️ 時間氣球 +3秒 ｜ 💥 小心炸彈！', GAME_WIDTH - 24, GAME_HEIGHT - 44);
+        ctx.restore();
+      } else {
+        // 注音聽音模式：繪製底部紅色虛線 (氣球落地警戒線)
+        ctx.save();
+        ctx.strokeStyle = 'rgba(248, 113, 113, 0.65)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([12, 8]);
+        ctx.beginPath();
+        ctx.moveTo(20, GAME_HEIGHT - 60);
+        ctx.lineTo(GAME_WIDTH - 20, GAME_HEIGHT - 60);
+        ctx.stroke();
+
+        // 標示「警戒線」文字
+        ctx.fillStyle = 'rgba(252, 165, 165, 0.8)';
+        ctx.font = 'bold 14px "Noto Sans TC", sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText('▲ 氣球落地警戒線', GAME_WIDTH - 24, GAME_HEIGHT - 68);
+        ctx.restore();
+      }
     }
   }
 }

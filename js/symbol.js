@@ -1,33 +1,48 @@
-// Balloon 類別 - 管理掉落的注音符號氣球
+// Balloon 類別 - 管理注音符號掉落氣球與夜市射氣球標靶 (彩色氣球、黃金氣球、加時氣球、危險炸彈)
 
 class Balloon {
-  constructor(char, x, y, radius, speed, isCorrect, difficulty) {
-    this.char = char;         // 氣球內的注音符號
-    this.startX = x;          // 基準 X 座標
-    this.x = x;               // 當前 X 座標
-    this.y = y;               // 當前 Y 座標
-    this.radius = radius;     // 碰撞半徑
-    this.speed = speed;       // 掉落速度
+  constructor(char, x, y, radius, speed, isCorrect, difficulty, arcadeType = null) {
+    this.char = char;           // 氣球內的注音符號或標記
+    this.startX = x;            // 基準 X 座標
+    this.x = x;                 // 當前 X 座標
+    this.y = y;                 // 當前 Y 座標
+    this.radius = radius;       // 碰撞半徑
+    this.speed = speed;         // 移動速度
     this.isCorrect = isCorrect; // 是否為正確答案
-    this.active = true;       // 是否仍在畫面上
+    this.active = true;         // 是否仍在畫面上
+    this.arcadeType = arcadeType; // null (注音模式) | 'normal' | 'gold' | 'time' | 'bomb'
+    this.isArcade = arcadeType !== null;
 
     // 依據難度調整左右擺動幅度 (wobble)
-    this.wobbleSpeed = 0.03 + Math.random() * 0.02;
+    this.wobbleSpeed = 0.025 + Math.random() * 0.02;
     this.wobbleStrength = 0;
     
     if (difficulty === 'hard' || difficulty === 'boss') {
-      this.wobbleStrength = 15 + Math.random() * 20; // 高級/Boss 會左右擺動
+      this.wobbleStrength = 16 + Math.random() * 22; // 高級/Boss 會明顯左右擺動
     } else if (difficulty === 'medium') {
-      this.wobbleStrength = 5 + Math.random() * 5;   // 中級微幅擺動
+      this.wobbleStrength = 6 + Math.random() * 8;   // 中級微幅擺動
+    } else if (this.isArcade) {
+      this.wobbleStrength = 3 + Math.random() * 4;   // 夜市初級自然輕微飄動
     }
 
     this.wobbleOffset = Math.random() * Math.PI * 2; // 隨機相位差
 
-    // 氣球外觀色彩 - 使用明亮和諧的粉嫩 HSL 色彩
+    // 氣球外觀色彩
     const hue = Math.floor(Math.random() * 360);
     this.hue = hue;
-    this.color = `hsl(${hue}, 85%, 65%)`;
-    this.borderColor = `hsl(${hue}, 85%, 45%)`;
+    if (this.arcadeType === 'gold') {
+      this.color = '#facc15';
+      this.borderColor = '#ca8a04';
+    } else if (this.arcadeType === 'time') {
+      this.color = '#22d3ee';
+      this.borderColor = '#0891b2';
+    } else if (this.arcadeType === 'bomb') {
+      this.color = '#334155';
+      this.borderColor = '#0f172a';
+    } else {
+      this.color = `hsl(${hue}, 85%, 65%)`;
+      this.borderColor = `hsl(${hue}, 85%, 45%)`;
+    }
     this.textColor = '#ffffff';
 
     // 預先生成固定的手繪粉筆斜刷紋理 (避免每幀重算造成閃爍與效能消耗)
@@ -43,7 +58,7 @@ class Balloon {
     }
 
     // 氣球繩線長度與擺動
-    this.stringLength = 42;
+    this.stringLength = this.arcadeType === 'bomb' ? 0 : 42;
     this.tiltAngle = 0;
     this.isPopping = false;
     this.popProgress = 0.0;
@@ -59,17 +74,33 @@ class Balloon {
       return 'active';
     }
 
-    this.y += this.speed * dtScale;
+    if (this.isArcade) {
+      // 夜市打氣球模式：氣球由下往上飛升
+      this.y -= this.speed * dtScale;
+    } else {
+      // 注音聽音模式：氣球由上往下掉落
+      this.y += this.speed * dtScale;
+    }
 
     // 根據 Y 座標與正弦函數計算左右擺動與微幅鐘擺傾角
     const phase = this.y * this.wobbleSpeed + this.wobbleOffset;
     this.x = this.startX + Math.sin(phase) * this.wobbleStrength;
+    // 確保左右擺動不超出畫布邊界
+    this.x = Math.max(this.radius + 15, Math.min(GAME_WIDTH - this.radius - 15, this.x));
     this.tiltAngle = Math.cos(phase) * (this.wobbleStrength * 0.0045);
 
-    // 檢查是否超出畫面底部
-    if (this.y - this.radius > GAME_HEIGHT) {
-      this.active = false;
-      return 'missed'; // 代表漏答
+    if (this.isArcade) {
+      // 夜市模式：檢查是否飛出畫面頂部
+      if (this.y + this.radius + this.stringLength < -20) {
+        this.active = false;
+        return 'escaped';
+      }
+    } else {
+      // 注音模式：檢查是否超出畫面底部
+      if (this.y - this.radius > GAME_HEIGHT) {
+        this.active = false;
+        return 'missed'; // 代表漏答
+      }
     }
     return 'active';
   }
@@ -82,12 +113,113 @@ class Balloon {
     const dy = py - this.y;
     const distanceSq = dx * dx + dy * dy;
     
-    // 稍微放寬碰撞判定，讓滑鼠與光線槍更好瞄準 (增加 10px 判定容差)
-    const hitRadius = this.radius + 10;
+    // 稍微放寬碰撞判定，讓滑鼠與光線槍更好瞄準 (炸彈不額外放大容差以免誤傷，一般氣球增加 10px 容差)
+    const hitRadius = this.arcadeType === 'bomb' ? this.radius + 2 : this.radius + 10;
     return distanceSq < hitRadius * hitRadius;
   }
 
-  // 在 Canvas 上繪製氣球與注音
+  // 繪製危險炸彈標靶 (夜市模式專用)
+  drawBomb(ctx, currentRadius) {
+    const now = Date.now();
+    const pulse = 0.5 + 0.5 * Math.sin(now * 0.018);
+
+    // 外圍紅色危險脈衝光圈
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, currentRadius * (1.12 + pulse * 0.08), 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(239, 68, 68, ${0.45 + pulse * 0.45})`;
+    ctx.lineWidth = 3;
+    ctx.setLineDash([7, 5]);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.tiltAngle * 0.6);
+
+    // 1. 炸彈頂部金屬引線底座
+    ctx.fillStyle = '#475569';
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.rect(-currentRadius * 0.22, -currentRadius * 1.12, currentRadius * 0.44, currentRadius * 0.22);
+    ctx.fill();
+    ctx.stroke();
+
+    // 2. 彎曲引線
+    ctx.beginPath();
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 3.5;
+    ctx.moveTo(0, -currentRadius * 1.12);
+    ctx.quadraticCurveTo(currentRadius * 0.25, -currentRadius * 1.45, currentRadius * 0.42, -currentRadius * 1.32);
+    ctx.stroke();
+
+    // 3. 引線末端的動態跳動火花
+    const sparkX = currentRadius * 0.42;
+    const sparkY = -currentRadius * 1.32;
+    ctx.save();
+    ctx.translate(sparkX, sparkY);
+    ctx.rotate((now * 0.01) % (Math.PI * 2));
+    ctx.fillStyle = pulse > 0.5 ? '#fef08a' : '#f97316';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#ef4444';
+    for (let i = 0; i < 6; i++) {
+      ctx.rotate(Math.PI / 3);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -8 - pulse * 5);
+      ctx.strokeStyle = i % 2 === 0 ? '#fef08a' : '#ef4444';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(0, 0, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // 4. 炸彈黑色金屬球體
+    ctx.beginPath();
+    ctx.arc(0, 0, currentRadius, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(
+      -currentRadius * 0.3, -currentRadius * 0.3, currentRadius * 0.08,
+      0, 0, currentRadius * 1.05
+    );
+    grad.addColorStop(0, '#64748b');
+    grad.addColorStop(0.25, '#1e293b');
+    grad.addColorStop(1, '#090d16');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = '#ef4444';
+    ctx.stroke();
+
+    // 5. 炸彈表面高光
+    ctx.beginPath();
+    ctx.ellipse(-currentRadius * 0.35, -currentRadius * 0.35, currentRadius * 0.18, currentRadius * 0.09, -Math.PI / 4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.32)';
+    ctx.fill();
+
+    // 6. 中央醒目危險骷髏 / 叉叉標記
+    ctx.rotate(-this.tiltAngle * 0.6);
+    ctx.strokeStyle = '#f87171';
+    ctx.lineWidth = 4.5;
+    ctx.lineCap = 'round';
+    const r = currentRadius * 0.34;
+    ctx.beginPath();
+    ctx.moveTo(-r, -r + 4);
+    ctx.lineTo(r, r + 4);
+    ctx.moveTo(r, -r + 4);
+    ctx.lineTo(-r, r + 4);
+    ctx.stroke();
+
+    ctx.font = `900 ${currentRadius * 0.42}px "Fredoka", "Noto Sans TC", sans-serif`;
+    ctx.fillStyle = '#fef08a';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('BOMB', 0, -currentRadius * 0.36);
+  }
+
+  // 在 Canvas 上繪製氣球與注音/夜市標靶
   draw(ctx) {
     if (!this.active) return;
 
@@ -100,9 +232,16 @@ class Balloon {
       currentRadius = this.radius * (1 + this.popProgress * 0.35);
     }
 
-    // 接近底部警戒線 (GAME_HEIGHT - 60) 時，繪製柔和危險警示光暈
+    // 如果是夜市模式的炸彈，呼叫炸彈專屬繪製
+    if (this.isArcade && this.arcadeType === 'bomb') {
+      this.drawBomb(ctx, currentRadius);
+      ctx.restore();
+      return;
+    }
+
+    // 注音模式下：接近底部警戒線 (GAME_HEIGHT - 60) 時，繪製柔和危險警示光暈
     const dangerZoneY = GAME_HEIGHT - 190;
-    if (!this.isPopping && this.y > dangerZoneY) {
+    if (!this.isArcade && !this.isPopping && this.y > dangerZoneY) {
       const dangerRatio = Math.min(1, (this.y - dangerZoneY) / 130);
       const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.015);
       ctx.save();
@@ -115,7 +254,19 @@ class Balloon {
       ctx.restore();
     }
 
-    // 1. 繪製氣球繩線與結 (在旋轉座標系外或隨球體微擺)
+    // 黃金氣球專屬外圍閃耀光環
+    if (this.arcadeType === 'gold' && !this.isPopping) {
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.02);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, currentRadius * (1.14 + pulse * 0.08), 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(254, 240, 138, ${0.5 + pulse * 0.4})`;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 1. 繪製氣球繩線與結
     ctx.beginPath();
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
     ctx.lineWidth = 2;
@@ -198,25 +349,55 @@ class Balloon {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
     ctx.fill();
 
-    // 5. 繪製注音文字 (取消傾角讓注音符號維持端正易讀，並增加粉筆微光)
+    // 5. 繪製氣球中央文字或夜市圖騰 (取消傾角讓符號維持端正易讀)
     ctx.rotate(-this.tiltAngle);
-    ctx.font = `900 ${currentRadius * 1.1}px "Noto Sans TC", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // 5a. 文字陰影 (粗描邊模擬黑板粉筆字立體襯底)
-    ctx.lineWidth = 6;
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.72)';
-    ctx.strokeText(this.char, 0, 2);
+    if (!this.isArcade) {
+      // 注音模式：繪製注音符號
+      ctx.font = `900 ${currentRadius * 1.1}px "Noto Sans TC", sans-serif`;
+      ctx.lineWidth = 6;
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.72)';
+      ctx.strokeText(this.char, 0, 2);
 
-    // 5b. 文字主體與粉筆粉塵微光
-    ctx.save();
-    ctx.shadowBlur = 5;
-    ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
-    ctx.fillStyle = this.textColor;
-    ctx.fillText(this.char, 0, 0);
-    ctx.restore();
+      ctx.save();
+      ctx.shadowBlur = 5;
+      ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
+      ctx.fillStyle = this.textColor;
+      ctx.fillText(this.char, 0, 0);
+      ctx.restore();
+    } else if (this.arcadeType === 'gold') {
+      // 夜市黃金高分氣球：繪製 ★300
+      ctx.font = `900 ${currentRadius * 0.62}px "Fredoka", "Noto Sans TC", sans-serif`;
+      ctx.lineWidth = 4.5;
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(66, 32, 6, 0.85)';
+      ctx.strokeText('★300', 0, 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('★300', 0, 0);
+    } else if (this.arcadeType === 'time') {
+      // 夜市時間獎勵氣球：繪製 +3s
+      ctx.font = `900 ${currentRadius * 0.72}px "Fredoka", "Noto Sans TC", sans-serif`;
+      ctx.lineWidth = 4.5;
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(8, 51, 68, 0.85)';
+      ctx.strokeText('+3s', 0, 2);
+      ctx.fillStyle = '#fef08a';
+      ctx.fillText('+3s', 0, 0);
+    } else {
+      // 夜市一般彩色氣球：繪製柔和手繪星芒光紋，呈現純粹夜市氣球感
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.38)';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      const sr = currentRadius * 0.22;
+      ctx.beginPath();
+      ctx.arc(0, currentRadius * 0.12, sr, 0.15 * Math.PI, 0.85 * Math.PI);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     ctx.restore();
   }
