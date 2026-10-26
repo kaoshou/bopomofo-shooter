@@ -76,43 +76,31 @@ class GameManager {
 
     if (btnZhuyin && btnArcade) {
       if (this.gameCategory === 'arcade') {
-        btnArcade.classList.add('btn-accent');
-        btnArcade.classList.remove('btn-gray', 'btn-primary');
-        btnZhuyin.classList.add('btn-gray');
-        btnZhuyin.classList.remove('btn-primary', 'btn-accent');
+        btnArcade.classList.add('active-arcade');
+        btnZhuyin.classList.remove('active-zhuyin');
       } else {
-        btnZhuyin.classList.add('btn-primary');
-        btnZhuyin.classList.remove('btn-gray', 'btn-accent');
-        btnArcade.classList.add('btn-gray');
-        btnArcade.classList.remove('btn-primary', 'btn-accent');
+        btnZhuyin.classList.add('active-zhuyin');
+        btnArcade.classList.remove('active-arcade');
       }
     }
 
     if (titleEl) {
       titleEl.textContent = this.gameCategory === 'arcade'
-        ? '選擇模式與難度 — 🎈 夜市射氣球'
-        : '選擇模式與難度 — 🎯 注音聽音挑戰';
+        ? '選擇模式與難度 — 夜市射氣球'
+        : '選擇模式與難度 — 注音聽音挑戰';
     }
 
-    // 動態更新 4 張難度卡片的標題與描述
-    const zhuyinDescriptions = {
-      easy: '只出現常見 8 個符號，掉落速度慢，干擾少。適合初學者。',
-      medium: '加入更多符號，掉落速度加快，干擾氣球變多。',
-      hard: '包含所有 37 個注音，速度極快，氣球晃動，多重干擾。',
-      boss: '限時連續聽音！魔王會不斷丟出氣球，快速射擊來削減魔王血量！'
-    };
-
+    // 動態更新 4 張難度卡片的標題與描述 (對應 config.js 的 label 與 description 欄位)
     ['easy', 'medium', 'hard', 'boss'].forEach(diff => {
       const nameEl = document.getElementById(`diff-name-${diff}`);
       const descEl = document.getElementById(`diff-desc-${diff}`);
-      if (this.gameCategory === 'arcade' && typeof ARCADE_DIFFICULTY_CONFIG !== 'undefined') {
-        const cfg = ARCADE_DIFFICULTY_CONFIG[diff];
-        if (nameEl && cfg) nameEl.textContent = cfg.name;
-        if (descEl && cfg) descEl.textContent = cfg.desc;
-      } else if (typeof DIFFICULTY_CONFIG !== 'undefined') {
-        const cfg = DIFFICULTY_CONFIG[diff];
-        if (nameEl && cfg) nameEl.textContent = cfg.name;
-        if (descEl) descEl.textContent = zhuyinDescriptions[diff] || '';
+      const cfg = this.gameCategory === 'arcade'
+        ? (typeof ARCADE_DIFFICULTY_CONFIG !== 'undefined' ? ARCADE_DIFFICULTY_CONFIG[diff] : null)
+        : (typeof DIFFICULTY_CONFIG !== 'undefined' ? DIFFICULTY_CONFIG[diff] : null);
+
+      if (cfg) {
+        if (nameEl) nameEl.textContent = cfg.label || '';
+        if (descEl) descEl.textContent = cfg.description || '';
       }
     });
   }
@@ -229,13 +217,13 @@ class GameManager {
     if (isArcade) {
       if (btnReplayAudio) btnReplayAudio.classList.add('hidden');
       if (hudQuestionLabel) {
-        const shortTitle = config.name.split(' ')[0];
-        hudQuestionLabel.innerHTML = `<span style="color: #fef08a;">🎈 ${shortTitle}</span>｜擊破: <span id="question-char" style="color: #4ade80; font-weight: 900;">0</span>`;
+        const shortTitle = (config.label || '夜市射氣球').split(' ')[0];
+        hudQuestionLabel.innerHTML = `<svg class="icon-svg" viewBox="0 0 24 24" style="margin-right: 4px; color: #fef08a;"><path d="M12 2a6 6 0 0 0-6 6c0 3.5 3 6.5 6 8.5 3-2 6-5 6-8.5a6 6 0 0 0-6-6z"></path><path d="M12 16.5c-.5.5-1 1-1 2s.5 2 1 2.5"></path></svg><span style="color: #fef08a;">${shortTitle}</span>｜擊破: <span id="arcade-hit-count" style="color: #4ade80; font-weight: 900;">0</span>`;
       }
     } else {
       if (btnReplayAudio) btnReplayAudio.classList.remove('hidden');
       if (hudQuestionLabel) {
-        hudQuestionLabel.innerHTML = `目標發音: <span id="question-char" style="color: var(--color-accent-yellow); font-weight: 900;">？</span>`;
+        hudQuestionLabel.textContent = '聽音射擊: ?';
       }
     }
 
@@ -827,9 +815,9 @@ class GameManager {
 
     // 夜市射氣球模式：即時更新中央擊破數
     if (isArcade) {
-      const qChar = document.getElementById('question-char');
-      if (qChar) {
-        qChar.textContent = `${this.arcadeBalloonsPopped}`;
+      const hitEl = document.getElementById('arcade-hit-count');
+      if (hitEl) {
+        hitEl.textContent = `${this.arcadeBalloonsPopped}`;
       }
     }
 

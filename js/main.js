@@ -7,12 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 2. 綁定首頁 Scene 事件
   document.getElementById('btn-start-game').addEventListener('click', () => {
-    gameManager.setGameCategory('zhuyin');
-    gameManager.changeState('MODE_SELECT');
-  });
-
-  document.getElementById('btn-start-arcade')?.addEventListener('click', () => {
-    gameManager.setGameCategory('arcade');
     gameManager.changeState('MODE_SELECT');
   });
 

@@ -257,6 +257,56 @@ body {
   font-weight: 700;
 }
 
+/* 遊戲主題膠囊切換頁籤 (區分主玩法層級，不與下方模式按鈕混淆) */
+.category-tabs {
+  display: flex;
+  gap: 8px;
+  width: 840px;
+  background: rgba(0, 0, 0, 0.38);
+  padding: 6px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
+  margin-bottom: 12px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.category-tab {
+  flex: 1;
+  font-family: var(--font-primary);
+  font-size: 1.15rem;
+  font-weight: 700;
+  padding: 10px 20px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.category-tab:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.category-tab.active-zhuyin {
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+  color: #ffffff;
+  border-color: rgba(147, 197, 253, 0.65);
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.45);
+}
+
+.category-tab.active-arcade {
+  background: linear-gradient(180deg, #facc15 0%, #eab308 100%);
+  color: #422006;
+  border-color: rgba(254, 240, 138, 0.85);
+  box-shadow: 0 3px 10px rgba(234, 179, 8, 0.45);
+}
+
 .grid-select {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -269,10 +319,14 @@ body {
   background: rgba(255, 255, 255, 0.08);
   border: 2px solid rgba(255, 255, 255, 0.15);
   border-radius: 16px;
-  padding: 15px;
+  padding: 13px 16px;
+  min-height: 82px;
   cursor: pointer;
   transition: all 0.2s ease;
   text-align: left;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .difficulty-card:hover {

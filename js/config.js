@@ -49,8 +49,8 @@ const ZHUYIN_LIST = [
 // 難度設定
 const DIFFICULTY_CONFIG = {
   easy: {
-    label: '初級',
-    description: '只出現常見 8 個符號，掉落速度慢，干擾少',
+    label: '初級 (Easy)',
+    description: '只出現常見 8 個符號，掉落速度慢，干擾少。適合初學者。',
     allowedSymbols: ['ㄅ', 'ㄆ', 'ㄇ', 'ㄈ', 'ㄉ', 'ㄊ', 'ㄋ', 'ㄌ'],
     balloonCount: 3,        // 同時出現在畫面上的氣球數
     speedMin: 0.35,          // 最慢速度 (px/frame) - 調慢以利辨識與操作
@@ -60,8 +60,8 @@ const DIFFICULTY_CONFIG = {
     lives: 5                // 生命值
   },
   medium: {
-    label: '中級',
-    description: '加入更多符號，掉落速度加快，干擾氣球變多',
+    label: '中級 (Normal)',
+    description: '加入更多符號，掉落速度加快，干擾氣球變多。',
     // 包含大部分聲母與韻母
     allowedSymbols: [
       'ㄅ', 'ㄆ', 'ㄇ', 'ㄈ', 'ㄉ', 'ㄊ', 'ㄋ', 'ㄌ', 
@@ -76,8 +76,8 @@ const DIFFICULTY_CONFIG = {
     lives: 5
   },
   hard: {
-    label: '高級',
-    description: '包含所有 37 個注音，速度極快，氣球晃動，多重干擾',
+    label: '高級 (Hard)',
+    description: '包含所有 37 個注音，速度極快，氣球晃動，多重干擾。',
     allowedSymbols: ZHUYIN_LIST.map(s => s.char),
     balloonCount: 6,
     speedMin: 0.75,
@@ -87,7 +87,7 @@ const DIFFICULTY_CONFIG = {
     lives: 3
   },
   boss: {
-    label: '魔王挑戰',
+    label: '魔王挑戰 (Boss)',
     description: '限時連續聽音！魔王會不斷丟出氣球，快速射擊來削減魔王血量！',
     allowedSymbols: ZHUYIN_LIST.map(s => s.char),
     balloonCount: 8,
